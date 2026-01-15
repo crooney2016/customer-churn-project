@@ -6,8 +6,7 @@
   "exclude": [
     "**/__pycache__",
     "**/node_modules",
-    "**/.venv",
-    "venv"
+    "**/.venv"
   ],
   "reportMissingImports": "warning",
   "reportMissingModuleSource": "warning",

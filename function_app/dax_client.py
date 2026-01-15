@@ -3,10 +3,13 @@ Power BI DAX query execution client.
 Uses MSAL for authentication and Power BI REST API.
 """
 
-from typing import Optional
+from pathlib import Path
+from typing import Any, Dict, Optional
+
 import pandas as pd
 import requests
 from msal import ConfidentialClientApplication
+
 from .config import config
 
 
@@ -19,13 +22,23 @@ def get_access_token() -> str:
     )
 
     scope = "https://analysis.windows.net/powerbi/api/.default"
-    result = app.acquire_token_for_client(scopes=[scope])
+    result: Optional[Dict[str, Any]] = app.acquire_token_for_client(scopes=[scope])
+
+    if result is None:
+        raise RuntimeError("Failed to acquire token: No response from authentication service")
+
+    if not isinstance(result, dict):
+        raise RuntimeError("Failed to acquire token: Invalid response type")
 
     if "access_token" not in result:
-        error_desc = result.get('error_description', 'Unknown error')
+        error_desc: str = str(result.get('error_description', 'Unknown error'))
         raise RuntimeError(f"Failed to acquire token: {error_desc}")
 
-    return result["access_token"]
+    access_token: Any = result.get("access_token")
+    if not access_token or not isinstance(access_token, str):
+        raise RuntimeError("Failed to acquire token: access_token is missing or invalid")
+
+    return str(access_token)
 
 
 def execute_dax_query(query: str, dataset_id: Optional[str] = None) -> pd.DataFrame:
@@ -95,14 +108,47 @@ def execute_dax_query(query: str, dataset_id: Optional[str] = None) -> pd.DataFr
     return df
 
 
+def load_dax_query_from_file(query_name: str = "churn_features") -> str:
+    """
+    Load DAX query from dax/ directory files.
+    
+    Args:
+        query_name: Name of the DAX query file (without .dax extension).
+                   Options: "churn_features" or "churn_features_dax_multimonth"
+                   Defaults to "churn_features"
+    
+    Returns:
+        DAX query string from the file
+    
+    Raises:
+        FileNotFoundError: If the DAX query file doesn't exist
+    """
+    # Get project root (parent of function_app directory)
+    project_root = Path(__file__).parent.parent
+    query_path = project_root / "dax" / f"{query_name}.dax"
+
+    if not query_path.exists():
+        raise FileNotFoundError(
+            f"DAX query file not found: {query_path}. "
+            f"Available options: churn_features, churn_features_dax_multimonth"
+        )
+
+    return query_path.read_text(encoding="utf-8")
+
+
 def get_dax_query_from_dataset(query_name: Optional[str] = None) -> str:
     """
-    Get DAX query from dataset (if stored as a query).
-    For now, returns empty string - queries should be passed directly.
+    Get DAX query by loading from dax/ directory file.
+    This is a convenience wrapper around load_dax_query_from_file.
+
+    Args:
+        query_name: Name of the DAX query file (without .dax extension).
+                   If None, uses config.DAX_QUERY_NAME or defaults to "churn_features"
+    
+    Returns:
+        DAX query string from the file
     """
-    # This could be extended to fetch queries from Power BI if needed
-    if query_name:
-        # In a real implementation, you might fetch the query from Power BI
-        # For now, queries should be provided directly
-        pass
-    return ""
+    if query_name is None:
+        query_name = config.DAX_QUERY_NAME or "churn_features"
+
+    return load_dax_query_from_file(query_name)

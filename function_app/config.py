@@ -4,7 +4,18 @@ Loads settings from environment variables.
 """
 
 import os
+from pathlib import Path
 from typing import Optional
+
+try:
+    from dotenv import load_dotenv
+    # Load .env file from project root (parent of function_app directory)
+    env_path = Path(__file__).parent.parent / ".env"
+    if env_path.exists():
+        load_dotenv(env_path)
+except ImportError:
+    # python-dotenv not installed, skip .env loading
+    pass
 
 
 class Config:

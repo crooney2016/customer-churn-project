@@ -28,8 +28,8 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
 1. **Create virtual environment:**
 
    ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   python3 -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
 2. **Install dependencies:**
