@@ -72,10 +72,10 @@ Outputs to `outputs/churn_scores.csv` with:
 One-time load of 2023-2025 historical data (~400k rows):
 
 ```bash
-python local_backfill.py historical_data.csv
+python score_customers.py chunks/
 ```
 
-Writes directly to SQL History table using same scoring logic as Function App.
+Scores all CSV files in the chunks/ directory and outputs to `outputs/churn_scores_combined.csv`.
 
 **Performance:**
 
@@ -147,8 +147,7 @@ Writes directly to SQL History table using same scoring logic as Function App.
 
 ```text
 .
-├── score_customers.py          # Local scoring script
-├── local_backfill.py           # Historical data loader
+├── score_customers.py          # Local scoring script (handles single files, directories, or chunks)
 ├── requirements.txt            # Python dependencies
 ├── .env.example                # Environment variable template
 ├── model/                      # XGBoost model files
