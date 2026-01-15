@@ -6,9 +6,9 @@ Can score a single CSV file, all CSV files in a directory, or all chunks in chun
 Uses the shared scoring logic from function_app.scorer to avoid code duplication.
 
 Usage:
-    python score_chunks.py                          # Score all files in chunks/ folder
-    python score_chunks.py <input_csv_path>         # Score a single CSV file
-    python score_chunks.py <directory_path>         # Score all CSVs in directory
+    python score_customers.py                       # Score all files in chunks/ folder
+    python score_customers.py <input_csv_path>      # Score a single CSV file
+    python score_customers.py <directory_path>      # Score all CSVs in directory
 
 Output:
     outputs/churn_scores_combined.csv - All scored records
@@ -25,10 +25,9 @@ from pathlib import Path
 
 import pandas as pd
 
-# Add function_app to path for imports
-# Import scorer directly to avoid SQL dependencies
+# Add function_app to path for imports before importing scorer
 sys.path.insert(0, str(Path(__file__).parent / "function_app"))
-from scorer import score_customers  # type: ignore[import-untyped] # pylint: disable=import-error
+from scorer import score_customers  # type: ignore[import-untyped] # pylint: disable=import-error,wrong-import-position
 
 logging.basicConfig(
     level=logging.INFO,
@@ -164,7 +163,11 @@ def copy_documentation(output_dir: Path) -> None:
         logger.info("Copied model/conda.yml to output directory")
 
 
-def write_output(combined_df: pd.DataFrame, output_dir: Path, output_name: str = "churn_scores_combined.csv") -> Path:
+def write_output(
+    combined_df: pd.DataFrame,
+    output_dir: Path,
+    output_name: str = "churn_scores_combined.csv"
+) -> Path:
     """
     Write combined results to CSV file.
 
@@ -233,9 +236,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python score_chunks.py                          # Score all files in chunks/ folder
-  python score_chunks.py data/validate.csv        # Score a single file
-  python score_chunks.py chunks/                  # Score all CSVs in chunks/ directory
+  python score_customers.py                      # Score all files in chunks/ folder
+  python score_customers.py data/validate.csv     # Score a single file
+  python score_customers.py chunks/                # Score all CSVs in chunks/ directory
         """
     )
     parser.add_argument(
