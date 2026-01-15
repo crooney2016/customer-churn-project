@@ -1,7 +1,7 @@
 {
   "include": [
     "function_app",
-    "score_customers.py"
+    "scripts"
   ],
   "exclude": [
     "**/__pycache__",

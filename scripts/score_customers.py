@@ -2,13 +2,13 @@
 """
 Unified local scoring script for churn prediction.
 
-Can score a single CSV file, all CSV files in a directory, or all chunks in chunks/ folder.
+Can score a single CSV file, all CSV files in a directory, or all files in data/ folder.
 Uses the shared scoring logic from function_app.scorer to avoid code duplication.
 
 Usage:
-    python score_customers.py                       # Score all files in chunks/ folder
-    python score_customers.py <input_csv_path>      # Score a single CSV file
-    python score_customers.py <directory_path>      # Score all CSVs in directory
+    python scripts/score_customers.py                       # Score all files in data/ folder
+    python scripts/score_customers.py <input_csv_path>      # Score a single CSV file
+    python scripts/score_customers.py <directory_path>      # Score all CSVs in directory
 
 Output:
     outputs/churn_scores_combined.csv - All scored records
@@ -20,13 +20,15 @@ import argparse
 import logging
 import shutil
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 
 # Add function_app to path for imports before importing scorer
-sys.path.insert(0, str(Path(__file__).parent / "function_app"))
+# From scripts/, go up one level to project root, then into function_app
+sys.path.insert(0, str(Path(__file__).parent.parent / "function_app"))
 from scorer import score_customers  # type: ignore[import-untyped] # pylint: disable=import-error,wrong-import-position
 
 logging.basicConfig(
@@ -86,8 +88,10 @@ def process_files(csv_files: list) -> pd.DataFrame:
     """
     all_results = []
     total_rows = 0
+    start_time = time.time()
 
     for idx, csv_file in enumerate(csv_files, 1):
+        file_start = time.time()
         logger.info(
             "Processing file %d/%d: %s",
             idx,
@@ -97,11 +101,20 @@ def process_files(csv_files: list) -> pd.DataFrame:
 
         try:
             # Read CSV
+            load_start = time.time()
             df = pd.read_csv(csv_file, low_memory=False)
-            logger.info("  Loaded %d rows from %s", len(df), csv_file.name)
+            load_time = time.time() - load_start
+            logger.info(
+                "  Loaded %d rows from %s (%.2f seconds)",
+                len(df),
+                csv_file.name,
+                load_time
+            )
 
             # Score this file
+            score_start = time.time()
             scored_df = score_customers(df)
+            score_time = time.time() - score_start
 
             # Add source file metadata
             scored_df['SourceFile'] = csv_file.name
@@ -109,10 +122,19 @@ def process_files(csv_files: list) -> pd.DataFrame:
             all_results.append(scored_df)
             total_rows += len(scored_df)
 
+            file_time = time.time() - file_start
             logger.info(
-                "  Scored %d records (total so far: %d)",
+                "  Scored %d records in %.2f seconds (%.2f sec/1000 rows) - Total so far: %d",
                 len(scored_df),
+                score_time,
+                (score_time / len(scored_df)) * 1000 if len(scored_df) > 0 else 0,
                 total_rows
+            )
+            logger.info(
+                "  File %d/%d completed in %.2f seconds",
+                idx,
+                len(csv_files),
+                file_time
             )
 
         except Exception as e:
@@ -125,13 +147,26 @@ def process_files(csv_files: list) -> pd.DataFrame:
             raise
 
     # Combine all results
+    combine_start = time.time()
     if len(all_results) == 1:
         combined_df = all_results[0]
         logger.info("Single file processed: %d records", len(combined_df))
     else:
         logger.info("Combining %d files into single DataFrame...", len(all_results))
         combined_df = pd.concat(all_results, ignore_index=True)
-        logger.info("Combined %d total records", len(combined_df))
+        combine_time = time.time() - combine_start
+        logger.info(
+            "Combined %d total records in %.2f seconds",
+            len(combined_df),
+            combine_time
+        )
+
+    total_time = time.time() - start_time
+    logger.info(
+        "Total processing time: %.2f seconds (%.2f minutes)",
+        total_time,
+        total_time / 60
+    )
 
     # Add processing timestamp
     combined_df['ScoredAt'] = datetime.now()
@@ -146,7 +181,8 @@ def copy_documentation(output_dir: Path) -> None:
     Args:
         output_dir: Path to output directory
     """
-    project_root = Path(__file__).parent
+    # From scripts/, go up one level to project root
+    project_root = Path(__file__).parent.parent
 
     # Copy README.md
     readme_src = project_root / "README.md"
@@ -182,10 +218,19 @@ def write_output(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / output_name
 
+    write_start = time.time()
     logger.info("Writing results to %s...", output_file)
     combined_df.to_csv(output_file, index=False)
+    write_time = time.time() - write_start
 
-    logger.info("Successfully wrote %d records to %s", len(combined_df), output_file)
+    file_size_mb = output_file.stat().st_size / (1024 * 1024)
+    logger.info(
+        "Successfully wrote %d records (%.2f MB) to %s in %.2f seconds",
+        len(combined_df),
+        file_size_mb,
+        output_file,
+        write_time
+    )
     return output_file
 
 
@@ -236,16 +281,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python score_customers.py                      # Score all files in chunks/ folder
-  python score_customers.py data/validate.csv     # Score a single file
-  python score_customers.py chunks/                # Score all CSVs in chunks/ directory
+  python scripts/score_customers.py                      # Score all files in data/ folder
+  python scripts/score_customers.py data/validate.csv     # Score a single file
+  python scripts/score_customers.py data/                 # Score all CSVs in data/ directory
         """
     )
     parser.add_argument(
         'input_path',
         nargs='?',
-        default='chunks',
-        help='Path to CSV file or directory containing CSV files (default: chunks/)'
+        default='data',
+        help='Path to CSV file or directory containing CSV files (default: data/)'
     )
     parser.add_argument(
         '-o', '--output',
@@ -255,7 +300,8 @@ Examples:
 
     args = parser.parse_args()
 
-    project_root = Path(__file__).parent
+    # From scripts/, go up one level to project root
+    project_root = Path(__file__).parent.parent
     input_path = Path(args.input_path)
     if not input_path.is_absolute():
         input_path = project_root / input_path
@@ -268,24 +314,41 @@ Examples:
     output_filename = output_path.name
 
     try:
+        script_start = time.time()
+        logger.info("=" * 60)
+        logger.info("Starting churn scoring process")
+        logger.info("=" * 60)
+
         # Find CSV files to process
+        logger.info("Discovering CSV files...")
         csv_files = find_csv_files(input_path)
 
         # Process all files
+        logger.info("Starting to process files...")
         combined_df = process_files(csv_files)
 
         # Write output
+        logger.info("Writing output file...")
         output_file = write_output(combined_df, output_dir, output_filename)
 
         # Copy documentation
+        logger.info("Copying documentation files...")
         copy_documentation(output_dir)
 
         # Print summary
         print_summary(combined_df)
 
-        logger.info("\n✓ Scoring completed successfully!")
+        total_script_time = time.time() - script_start
+        logger.info("=" * 60)
+        logger.info("✓ Scoring completed successfully!")
+        logger.info(
+            "Total execution time: %.2f seconds (%.2f minutes)",
+            total_script_time,
+            total_script_time / 60
+        )
         logger.info("Output file: %s", output_file)
         logger.info("Output directory: %s", output_dir)
+        logger.info("=" * 60)
 
     except FileNotFoundError as e:
         logger.error("File not found: %s", str(e))

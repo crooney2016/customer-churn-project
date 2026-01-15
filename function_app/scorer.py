@@ -237,7 +237,13 @@ def score_customers(df: pd.DataFrame) -> pd.DataFrame:
     id_cols = [
         "CustomerId", "AccountName", "Segment", "CostCenter", "SnapshotDate"
     ]
+    date_cols = ["FirstPurchaseDate", "LastPurchaseDate"]
     original_df = df[id_cols].copy()
+    # Add date columns to output (needed for SQL Status calculation)
+    for col in date_cols:
+        if col in df.columns:
+            original_df[col] = df[col]
+    
     exclude_cols = ["FirstPurchaseDate", "LastPurchaseDate", "WillChurn90"]
     feature_cols = [
         c for c in df.columns

@@ -149,8 +149,6 @@ Scores all CSV files in the data/ directory and outputs to `outputs/churn_scores
 .
 ├── scripts/                    # Utility scripts
 │   ├── score_customers.py      # Local scoring script (handles single files, directories, or chunks)
-│   ├── split_csv.py            # Split large CSV files into chunks
-│   └── shape_for_sql_view.py   # Shape scored data to match SQL view structure
 ├── requirements.txt            # Python dependencies
 ├── .env.example                # Environment variable template
 ├── model/                      # XGBoost model files

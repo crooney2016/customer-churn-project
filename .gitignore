@@ -5,7 +5,7 @@ data/validate.csv
 data/new-and-returning-data.xlsx
 data/new-and-returning-data.csv
 scoring_input.csv
-chunks/*.csv
+data/*.csv
 
 # Model files (binary, large)
 *.pkl
