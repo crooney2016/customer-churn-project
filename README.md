@@ -51,37 +51,57 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
 
 ## Local Development Workflow
 
-### Scoring Customers
+### Scoring Customers (Recommended: Notebook)
 
-Score a CSV file locally:
+**Use the interactive notebook for easier debugging and exploration:**
+
+Open `scripts/local_scoring.ipynb` in Jupyter/VS Code:
+
+- Interactive step-by-step execution
+- Visualize intermediate results
+- Easy to debug and modify
+- Uses the same scoring logic as production (`function_app/scorer.py`)
+
+The notebook handles:
+
+- **Optional:** Split large CSV files into chunks
+- **Load** CSV files (single file or directory)
+- **Score** customers with churn predictions (uses production `function_app/scorer.py`)
+- **Shape** data to match SQL view structure (`dbo.vwCustomerCurrent`)
+- **Analyze** and generate comprehensive business report
+- **Export** outputs for Power BI exploration
+
+**Outputs:**
+
+- `outputs/churn_scores_combined.csv` - All scored records (all snapshots)
+- `outputs/churn_scores_sql_view.csv` - **Shaped to match SQL view `dbo.vwCustomerCurrent`** (latest snapshot per customer, includes Status calculation)
+- `outputs/model_report.md` - **Formal business report** with model analysis, KPIs, distributions, and insights
+- `outputs/README.md` - Project documentation
+- `outputs/model_conda.yml` - Model environment configuration
+
+### Command-Line Scripts (Alternative)
+
+If you prefer command-line execution:
 
 ```bash
-python scripts/score_customers.py data/validate.csv
+# Use the interactive notebook for local scoring (recommended)
+# Open scripts/local_scoring.ipynb and run the cells
 ```
-
-Outputs to `outputs/churn_scores.csv` with:
-
-- All 77 original DAX features
-- ChurnRiskPct (0-1 probability)
-- RiskBand (A/B/C)
-- Reason_1, Reason_2, Reason_3 (human-readable explanations)
-- ScoredAt timestamp
-
-### Historical Backfill
-
-One-time load of 2023-2025 historical data (~400k rows):
-
-```bash
-python scripts/score_customers.py data/
-```
-
-Scores all CSV files in the data/ directory and outputs to `outputs/churn_scores_combined.csv`.
 
 **Performance:**
 
 - 400k rows: ~2-3 minutes scoring + reasons
 - 12k rows (monthly): ~10 seconds
 - XGBoost is CPU-optimized, handles it easily
+
+**Note on SQL View Output:**
+
+The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.vwCustomerCurrent`:
+
+- Latest snapshot per customer (using `ROW_NUMBER` window function logic)
+- Status calculation (New/Active/Churned/Reactivated) matching `fnCalculateStatus`
+- Column ordering matches SQL view structure
+- Ready for Power BI exploration with the same structure as production SQL
 
 ## Database Setup
 
@@ -147,10 +167,9 @@ Scores all CSV files in the data/ directory and outputs to `outputs/churn_scores
 
 ```text
 .
-├── scripts/                    # Utility scripts
-│   ├── score_customers.py      # Local scoring script (handles single files, directories, or chunks)
-│   ├── split_csv.py            # Split large CSV files into chunks
-│   └── shape_for_sql_view.py   # Shape scored data to match SQL view structure
+├── scripts/                    # Utility scripts and notebooks
+│   ├── local_scoring.ipynb     # ⭐ Interactive notebook for local scoring (all-in-one workflow)
+│   └── clean-git-history.sh   # Git maintenance script
 ├── requirements.txt            # Python dependencies
 ├── .env.example                # Environment variable template
 ├── model/                      # XGBoost model files

@@ -53,29 +53,24 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
 
 ### Scoring Customers
 
-Score a CSV file locally:
+Score CSV files locally using the interactive notebook:
 
 ```bash
-python scripts/score_customers.py data/validate.csv
+# Open and run scripts/local_scoring.ipynb
+# The notebook provides a complete workflow for:
+# - Loading CSV files (single file or directory)
+# - Scoring customers with churn predictions
+# - Shaping data to match SQL view structure
+# - Exporting outputs for Power BI exploration
 ```
 
-Outputs to `outputs/churn_scores.csv` with:
+Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_view.csv` with:
 
 - All 77 original DAX features
 - ChurnRiskPct (0-1 probability)
 - RiskBand (A/B/C)
 - Reason_1, Reason_2, Reason_3 (human-readable explanations)
 - ScoredAt timestamp
-
-### Historical Backfill
-
-One-time load of 2023-2025 historical data (~400k rows):
-
-```bash
-python scripts/score_customers.py data/
-```
-
-Scores all CSV files in the data/ directory and outputs to `outputs/churn_scores_combined.csv`.
 
 **Performance:**
 
@@ -147,8 +142,8 @@ Scores all CSV files in the data/ directory and outputs to `outputs/churn_scores
 
 ```text
 .
-├── scripts/                    # Utility scripts
-│   ├── score_customers.py      # Local scoring script (handles single files, directories, or chunks)
+├── scripts/                    # Utility scripts and notebooks
+│   ├── local_scoring.ipynb     # ⭐ Interactive notebook for local scoring (all-in-one workflow)
 ├── requirements.txt            # Python dependencies
 ├── .env.example                # Environment variable template
 ├── model/                      # XGBoost model files
