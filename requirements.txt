@@ -1,4 +1,26 @@
+# Python Dependencies for Century Churn Prediction Project
+# 
+# This file contains all dependencies needed for:
+# - Local development (scripts, notebooks)
+# - Azure Function deployment (also uses function_app/requirements.txt)
+#
+# Install with: pip install -r requirements.txt
+
+# Azure Functions (for local testing and deployment)
+azure-functions>=1.18.0
+azure-identity>=1.15.0
+
+# Database
+pyodbc>=5.0.0
+
+# Machine Learning
 xgboost>=2.0.0
 pandas>=2.0.0
 numpy>=1.24.0
-pyodbc>=5.0.0
+
+# Power BI Integration
+msal>=1.24.0
+requests>=2.31.0
+
+# Configuration
+python-dotenv>=1.0.0
