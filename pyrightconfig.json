@@ -1,0 +1,29 @@
+{
+  "include": [
+    "function_app",
+    "score_customers.py",
+    "local_backfill.py"
+  ],
+  "exclude": [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/.venv",
+    "venv"
+  ],
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "warning",
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.9",
+  "typeCheckingMode": "basic",
+  "pythonPlatform": "Darwin",
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "pythonVersion": "3.9",
+      "pythonPlatform": "Darwin",
+      "extraPaths": [
+        "/Users/chrisrooney/Library/Python/3.9/lib/python/site-packages"
+      ]
+    }
+  ]
+}

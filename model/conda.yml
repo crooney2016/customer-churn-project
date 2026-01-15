@@ -1,0 +1,12 @@
+name: churn-scoring-env
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+    - pandas==1.5.3
+    - numpy==1.23.5
+    - xgboost==3.1.2
+    - scikit-learn==1.3.0
