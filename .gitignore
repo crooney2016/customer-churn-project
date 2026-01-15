@@ -1,0 +1,62 @@
+# Large data files (should not be in git)
+data/all-data.xlsx
+data/train.csv
+data/validate.csv
+data/new-and-returning-data.xlsx
+data/new-and-returning-data.csv
+scoring_input.csv
+chunks/*.csv
+
+# Model files (binary, large)
+*.pkl
+model/*.pkl
+function_app/model/*.pkl
+
+# Output files
+outputs/*.csv
+outputs/*.txt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cursor IDE files
+.cursor/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Azure Functions
+.python_packages/
+__pycache__/
