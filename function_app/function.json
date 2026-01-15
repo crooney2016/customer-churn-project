@@ -1,0 +1,39 @@
+[
+  {
+    "scriptFile": "__init__.py",
+    "bindings": [
+      {
+        "name": "timer",
+        "type": "timerTrigger",
+        "direction": "in",
+        "schedule": "0 0 6 1 * *"
+      }
+    ]
+  },
+  {
+    "scriptFile": "__init__.py",
+    "bindings": [
+      {
+        "name": "req",
+        "type": "httpTrigger",
+        "direction": "in",
+        "authLevel": "function",
+        "methods": ["post"],
+        "route": "score"
+      }
+    ]
+  },
+  {
+    "scriptFile": "__init__.py",
+    "bindings": [
+      {
+        "name": "req",
+        "type": "httpTrigger",
+        "direction": "in",
+        "authLevel": "function",
+        "methods": ["get"],
+        "route": "health"
+      }
+    ]
+  }
+]

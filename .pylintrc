@@ -1,0 +1,76 @@
+[MASTER]
+# Known packages that are in requirements.txt but may not be installed locally
+# These are available in Azure Functions runtime
+extension-pkg-whitelist=pylint.extensions.check_annotations
+
+[MESSAGES CONTROL]
+# Disable import-error for packages that are in requirements.txt
+# These will be available in the Azure Functions runtime
+disable=
+    import-error,
+    no-member,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements
+
+[IMPORTS]
+# Ignore import errors for these known packages
+ignored-modules=
+    azure.functions,
+    azure.identity,
+    msal,
+    requests,
+    pandas,
+    pyodbc,
+    xgboost,
+    numpy
+
+[TYPECHECK]
+# Ignore missing imports for known packages
+ignored-modules=
+    azure.functions,
+    azure.identity,
+    msal,
+    requests,
+    pandas,
+    pyodbc,
+    xgboost,
+    numpy
+
+[FORMAT]
+# Line length
+max-line-length=100
+
+# Indentation
+indent-string='    '
+indent-after-paren=4
+
+[DESIGN]
+# Maximum number of arguments
+max-args=10
+
+# Maximum number of attributes
+max-attributes=15
+
+# Maximum number of boolean expressions
+max-bool-expr=5
+
+# Maximum number of branch for function / method body
+max-branches=15
+
+# Maximum number of locals for function / method body
+max-locals=20
+
+# Maximum number of parents for a class
+max-parents=7
+
+# Maximum number of public methods
+max-public-methods=20
+
+# Maximum number of return / yield for function / method body
+max-returns=6
+
+# Maximum number of statements in function / method body
+max-statements=50
