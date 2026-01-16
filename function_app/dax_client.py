@@ -4,13 +4,20 @@ Uses MSAL for authentication and Power BI REST API.
 """
 
 import logging
-import time
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, TypeVar
+from typing import Any, Callable, Dict, List, Optional
 
 import pandas as pd
 import requests
 from msal import ConfidentialClientApplication
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    retry_if_exception_type,
+    RetryCallState,
+    before_sleep_log,
+    after_log,
+)
 
 from .config import config
 
@@ -39,98 +46,81 @@ EXPECTED_COLUMN_COUNT = 77
 MIN_COLUMN_COUNT = 70  # Allow some variance
 MAX_COLUMN_COUNT = 85  # Warn if too many
 
-T = TypeVar('T')
 
-
-def retry_with_backoff(
-    func: Callable[[], T],
-    max_attempts: int = MAX_RETRIES,
-    base_delay: float = BASE_RETRY_DELAY,
-    operation_name: str = "operation"
-) -> T:
+def _wait_for_429_or_exponential(retry_state: RetryCallState) -> float:
     """
-    Retry function with exponential backoff per error-handling.md.
+    Custom wait function that handles 429 rate limiting with Retry-After header,
+    otherwise uses exponential backoff.
 
     Args:
-        func: Function to retry
-        max_attempts: Maximum number of retry attempts (default: 3)
-        base_delay: Base delay in seconds for exponential backoff (default: 1.0)
-        operation_name: Name of operation for logging context
+        retry_state: Tenacity RetryCallState with exception info
 
     Returns:
-        Result of func()
-
-    Raises:
-        RuntimeError: If max retries exceeded
-        Exception: Re-raises last exception if all retries fail
+        Wait time in seconds
     """
-    last_exception: Optional[Exception] = None
-
-    for attempt in range(max_attempts):
-        try:
-            return func()
-        except requests.exceptions.HTTPError as e:
-            # Handle rate limiting (429) separately - check HTTPError first
-            # since it's a subclass of RequestException
-            if e.response is not None and e.response.status_code == 429:
-                retry_after = int(e.response.headers.get("Retry-After", 60))
-                if attempt == max_attempts - 1:
-                    logger.error(
-                        "Rate limited and max retries exceeded for %s",
-                        operation_name,
-                        exc_info=True
-                    )
-                    raise
-
-                logger.warning(
-                    "Rate limited (429) for %s. Retrying after %d seconds (attempt %d/%d)...",
-                    operation_name,
-                    retry_after,
-                    attempt + 1,
-                    max_attempts
-                )
-                time.sleep(retry_after)
-                last_exception = e
-            else:
-                # Non-retryable HTTP errors (400, 401, 403, etc.)
-                logger.error(
-                    "Non-retryable HTTP error for %s: %s",
-                    operation_name,
-                    str(e),
-                    exc_info=True
-                )
-                raise
-        except (
-            requests.exceptions.Timeout,
-            requests.exceptions.ConnectionError,
-            requests.exceptions.RequestException
-        ) as e:
-            last_exception = e
-            if attempt == max_attempts - 1:
-                logger.error(
-                    "Max retries (%d) exceeded for %s: %s",
-                    max_attempts,
-                    operation_name,
-                    str(e),
-                    exc_info=True
-                )
-                raise
-
-            delay = base_delay * (2 ** attempt)
+    if retry_state.outcome and retry_state.outcome.failed:
+        exception = retry_state.outcome.exception()
+        if (
+            isinstance(exception, requests.exceptions.HTTPError)
+            and exception.response is not None
+            and exception.response.status_code == 429
+        ):
+            retry_after = int(exception.response.headers.get("Retry-After", 60))
             logger.warning(
-                "Attempt %d/%d failed for %s: %s. Retrying in %.1f seconds...",
-                attempt + 1,
-                max_attempts,
-                operation_name,
-                str(e),
-                delay
+                "Rate limited (429). Retrying after %d seconds (attempt %d/%d)...",
+                retry_after,
+                retry_state.attempt_number,
+                MAX_RETRIES
             )
-            time.sleep(delay)
+            return float(retry_after)
 
-    if last_exception:
-        raise RuntimeError(f"Max retries exceeded for {operation_name}") from last_exception
+    # Default exponential backoff for other retries
+    wait_time = min(BASE_RETRY_DELAY * (2 ** (retry_state.attempt_number - 1)), 60)
+    return wait_time
 
-    raise RuntimeError(f"Unexpected retry loop exit for {operation_name}")
+
+def _should_retry_exception(exception: BaseException) -> bool:
+    """
+    Determine if exception should be retried.
+
+    Retries:
+    - Network errors (Timeout, ConnectionError)
+    - HTTP 429 (rate limiting)
+    - HTTP 5xx (server errors)
+
+    Does not retry:
+    - HTTP 4xx client errors (except 429)
+    - Other RequestException subtypes (checked after HTTPError)
+    """
+    # Handle HTTP errors first (HTTPError is a subclass of RequestException)
+    if isinstance(exception, requests.exceptions.HTTPError):
+        if exception.response is None:
+            return False
+        status_code = exception.response.status_code
+        # Retry rate limiting and server errors
+        return status_code == 429 or 500 <= status_code < 600
+
+    # Retry network/connection errors (but not HTTPError, already handled above)
+    if isinstance(exception, (
+        requests.exceptions.Timeout,
+        requests.exceptions.ConnectionError,
+    )):
+        return True
+
+    # Don't retry other RequestException subtypes (e.g., TooManyRedirects)
+    # unless they're the specific types we want to retry
+    return False
+
+
+# Configure retry decorator for transient errors per error-handling.md
+retry_transient = retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=_wait_for_429_or_exponential,
+    retry=retry_if_exception_type(Exception)(_should_retry_exception),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    after=after_log(logger, logging.ERROR),
+    reraise=True,
+)
 
 
 def normalize_column_names(df: pd.DataFrame) -> pd.DataFrame:
@@ -206,6 +196,7 @@ def validate_dax_columns(df: pd.DataFrame) -> None:
         )
 
 
+@retry_transient
 def get_access_token() -> str:
     """
     Get access token for Power BI using service principal.
@@ -216,8 +207,6 @@ def get_access_token() -> str:
     Raises:
         RuntimeError: If token acquisition fails
     """
-    logger.info("Acquiring Power BI access token...")
-
     app = ConfidentialClientApplication(
         client_id=config.PBI_CLIENT_ID,
         client_credential=config.PBI_CLIENT_SECRET,
@@ -226,36 +215,31 @@ def get_access_token() -> str:
 
     scope = "https://analysis.windows.net/powerbi/api/.default"
 
-    def _acquire_token() -> str:
-        result: Optional[Dict[str, Any]] = app.acquire_token_for_client(scopes=[scope])
+    result: Optional[Dict[str, Any]] = app.acquire_token_for_client(scopes=[scope])
 
-        if result is None:
-            error_msg = "Failed to acquire token: No response from authentication service"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+    if result is None:
+        error_msg = "Failed to acquire token: No response from authentication service"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
-        if not isinstance(result, dict):
-            error_msg = "Failed to acquire token: Invalid response type"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+    if not isinstance(result, dict):
+        error_msg = "Failed to acquire token: Invalid response type"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
-        if "access_token" not in result:
-            error_desc: str = str(result.get('error_description', 'Unknown error'))
-            error_msg = f"Failed to acquire token: {error_desc}"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+    if "access_token" not in result:
+        error_desc: str = str(result.get('error_description', 'Unknown error'))
+        error_msg = f"Failed to acquire token: {error_desc}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
-        access_token: Any = result.get("access_token")
-        if not access_token or not isinstance(access_token, str):
-            error_msg = "Failed to acquire token: access_token is missing or invalid"
-            logger.error(error_msg)
-            raise RuntimeError(error_msg)
+    access_token: Any = result.get("access_token")
+    if not access_token or not isinstance(access_token, str):
+        error_msg = "Failed to acquire token: access_token is missing or invalid"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
 
-        logger.info("Access token acquired successfully")
-        return str(access_token)
-
-    # Per error-handling.md: Retry transient errors
-    return retry_with_backoff(_acquire_token, operation_name="token acquisition")
+    return str(access_token)
 
 
 def _execute_single_dax_query(
@@ -282,7 +266,8 @@ def _execute_single_dax_query(
     """
     access_token = get_access_token()
 
-    # Build URL with or without workspace per power-bi.md
+    # Build URL - prefer workspace-scoped endpoint if provided
+    # Service principals may need explicit workspace context
     if workspace_id:
         url = (
             f"https://api.powerbi.com/v1.0/myorg/groups/{workspace_id}"
@@ -307,6 +292,7 @@ def _execute_single_dax_query(
         }
     }
 
+    @retry_transient
     def _make_request() -> pd.DataFrame:
         logger.debug(
             "Executing DAX query against dataset %s (query length: %d characters)",
@@ -316,7 +302,7 @@ def _execute_single_dax_query(
 
         response = requests.post(url, headers=headers, json=payload, timeout=timeout)
 
-        # Handle rate limiting explicitly
+        # Handle rate limiting explicitly (will be caught by retry decorator)
         if response.status_code == 429:
             retry_after = int(response.headers.get("Retry-After", 60))
             error_msg = (
@@ -352,7 +338,6 @@ def _execute_single_dax_query(
         rows = table.get("rows", [])
 
         if not rows:
-            logger.info("DAX query returned empty result set")
             return pd.DataFrame()
 
         # Extract column names
@@ -372,15 +357,8 @@ def _execute_single_dax_query(
         # Normalize column names (remove brackets per dax.md)
         df = normalize_column_names(df)
 
-        row_count = len(df)
-        column_count = len(df.columns)
-        logger.info(
-            "DAX query returned %d rows with %d columns",
-            row_count,
-            column_count
-        )
-
         # Check if we hit the row limit (indicates need for pagination)
+        row_count = len(df)
         if row_count >= MAX_ROWS_PER_QUERY - 100:  # Allow small buffer
             logger.warning(
                 "Query returned %d rows, close to API limit of %d. "
@@ -392,10 +370,7 @@ def _execute_single_dax_query(
         return df
 
     # Per error-handling.md: Retry transient errors
-    return retry_with_backoff(
-        _make_request,
-        operation_name=f"DAX query execution (dataset: {dataset_id})"
-    )
+    return _make_request()
 
 
 def execute_dax_query(
@@ -428,12 +403,6 @@ def execute_dax_query(
     """
     if dataset_id is None:
         dataset_id = config.PBI_DATASET_ID
-
-    logger.info(
-        "Executing DAX query against dataset %s (timeout: %ds)",
-        dataset_id,
-        timeout
-    )
 
     df = _execute_single_dax_query(query, dataset_id, timeout, workspace_id)
 
@@ -478,6 +447,8 @@ def execute_dax_query_paginated(
 
     Example:
         ```python
+        from datetime import datetime, timedelta
+
         def chunk_by_date_range(base_query: str, chunk_index: int) -> str:
             # Add date filter for this chunk
             start_date = datetime(2024, 1, 1) + timedelta(days=chunk_index * 30)
@@ -591,8 +562,6 @@ def load_dax_query_from_file(query_name: str = "churn_features") -> str:
     Raises:
         FileNotFoundError: If the DAX query file doesn't exist
     """
-    logger.info("Loading DAX query from file: %s", query_name)
-
     # Get project root (parent of function_app directory)
     project_root = Path(__file__).parent.parent
     query_path = project_root / "dax" / f"{query_name}.dax"

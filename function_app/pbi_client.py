@@ -6,10 +6,40 @@ Triggers dataset refresh via REST API.
 import time
 from typing import Optional
 import requests
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    retry_if_exception_type,
+    wait_exponential,
+    before_sleep_log,
+    after_log,
+)
+import logging
 from .config import config
 from .dax_client import get_access_token
 
+logger = logging.getLogger(__name__)
 
+# Retry configuration per error-handling.md
+MAX_RETRIES = 3
+BASE_RETRY_DELAY = 1.0
+
+# Retry decorator for transient errors
+retry_transient = retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=BASE_RETRY_DELAY, min=BASE_RETRY_DELAY, max=60),
+    retry=retry_if_exception_type((
+        requests.exceptions.Timeout,
+        requests.exceptions.ConnectionError,
+        requests.exceptions.RequestException,
+    )),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    after=after_log(logger, logging.ERROR),
+    reraise=True,
+)
+
+
+@retry_transient
 def trigger_dataset_refresh(dataset_id: Optional[str] = None) -> str:
     """
     Trigger Power BI dataset refresh.

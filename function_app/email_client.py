@@ -3,13 +3,43 @@ Email notification client using Microsoft Graph API.
 Sends success and failure notifications.
 """
 
-from typing import Optional, Dict
+from typing import Dict, List, Optional
 from datetime import datetime
+import logging
 import requests
 from msal import ConfidentialClientApplication
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    retry_if_exception_type,
+    wait_exponential,
+    before_sleep_log,
+    after_log,
+)
 from .config import config
 
+logger = logging.getLogger(__name__)
 
+# Retry configuration per error-handling.md
+MAX_RETRIES = 3
+BASE_RETRY_DELAY = 1.0
+
+# Retry decorator for transient errors
+retry_transient = retry(
+    stop=stop_after_attempt(MAX_RETRIES),
+    wait=wait_exponential(multiplier=BASE_RETRY_DELAY, min=BASE_RETRY_DELAY, max=60),
+    retry=retry_if_exception_type((
+        requests.exceptions.Timeout,
+        requests.exceptions.ConnectionError,
+        requests.exceptions.RequestException,
+    )),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    after=after_log(logger, logging.ERROR),
+    reraise=True,
+)
+
+
+@retry_transient
 def get_graph_access_token() -> str:
     """Get access token for Microsoft Graph API."""
     app = ConfidentialClientApplication(
@@ -27,10 +57,11 @@ def get_graph_access_token() -> str:
     return result["access_token"]
 
 
+@retry_transient
 def send_email(
     subject: str,
     body: str,
-    recipients: Optional[list[str]] = None
+    recipients: Optional[List[str]] = None
 ) -> None:
     """
     Send email via Microsoft Graph API.

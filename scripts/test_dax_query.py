@@ -19,9 +19,15 @@ The script will:
 
 import argparse
 import logging
+import os
 import sys
+import warnings
 from pathlib import Path
 from typing import Optional
+
+# Suppress urllib3 SSL warnings
+os.environ['PYTHONWARNINGS'] = 'ignore::UserWarning:urllib3'
+warnings.filterwarnings("ignore", category=UserWarning, module="urllib3")
 
 import requests
 
@@ -37,12 +43,14 @@ from function_app.dax_client import (
     get_dax_query_from_dataset
 )
 
-# Configure logging
+# Configure logging - suppress verbose library logs
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.WARNING,  # Only show warnings and errors by default
+    format='%(levelname)s: %(message)s'
 )
 logger = logging.getLogger(__name__)
+# Set our logger to INFO for user-facing messages
+logger.setLevel(logging.INFO)
 
 
 def validate_config() -> None:
@@ -61,11 +69,9 @@ def validate_config() -> None:
             missing.append(key)
 
     if missing:
-        logger.error("Missing required Power BI configuration: %s", ", ".join(missing))
-        logger.error("Please set these in your .env file")
+        print(f"✗ Missing configuration: {', '.join(missing)}")
+        print("  Please set these in your .env file")
         sys.exit(1)
-
-    logger.info("Configuration validated successfully")
 
 
 def load_query(query_name: Optional[str] = None, query_file: Optional[Path] = None) -> str:
@@ -81,17 +87,14 @@ def load_query(query_name: Optional[str] = None, query_file: Optional[Path] = No
     """
     if query_file:
         if not query_file.exists():
-            logger.error("Query file not found: %s", query_file)
+            print(f"✗ Query file not found: {query_file}")
             sys.exit(1)
-        logger.info("Loading query from file: %s", query_file)
         return query_file.read_text(encoding="utf-8")
 
     if query_name:
-        logger.info("Loading query: %s", query_name)
         return load_dax_query_from_file(query_name)
 
     # Default: use config or default query
-    logger.info("Using default query from config")
     return get_dax_query_from_dataset()
 
 
@@ -160,25 +163,26 @@ Examples:
 
     try:
         # Validate configuration
-        logger.info("=" * 60)
-        logger.info("DAX Query Test Script")
-        logger.info("=" * 60)
+        print("=" * 60)
+        print("DAX Query Test")
+        print("=" * 60)
         validate_config()
+        print("✓ Configuration validated")
 
         # Load query
         query = load_query(args.query_name, args.file)
-        logger.info("Query loaded: %d characters", len(query))
-        logger.debug("Query preview: %s...", query[:200])
+        print(f"✓ Query loaded ({len(query)} characters)")
 
         # Get dataset ID
         dataset_id = args.dataset_id or config.PBI_DATASET_ID
         workspace_id = args.workspace_id or getattr(config, "PBI_WORKSPACE_ID", None)
 
-        logger.info("Executing query against dataset: %s", dataset_id)
+        print(f"✓ Dataset: {dataset_id}")
         if workspace_id:
-            logger.info("Using workspace: %s", workspace_id)
+            print(f"✓ Workspace: {workspace_id}")
 
         # Execute query
+        print("\nExecuting query...")
         df = execute_dax_query(
             query=query,
             dataset_id=dataset_id,
@@ -188,46 +192,57 @@ Examples:
         )
 
         # Display results
-        logger.info("=" * 60)
-        logger.info("Query Results")
-        logger.info("=" * 60)
-        logger.info("Rows returned: %d", len(df))
-        logger.info("Columns: %d", len(df.columns))
+        print("\n" + "=" * 60)
+        print("Query Results")
+        print("=" * 60)
+        print(f"✓ Rows: {len(df)}, Columns: {len(df.columns)}")
 
         if len(df) > 0:
-            logger.info("\nColumn names:")
-            for i, col in enumerate(df.columns, 1):
-                logger.info("  %d. %s", i, col)
+            print(f"\nSample rows (first {args.sample_rows}):")
+            print(df.head(args.sample_rows).to_string())
 
-            logger.info("\nSample rows (first %d):", args.sample_rows)
-            logger.info("\n%s", df.head(args.sample_rows).to_string())
-
-            # Show data types
-            logger.info("\nData types:")
-            logger.info("\n%s", df.dtypes.to_string())
-
-            # Show summary statistics for numeric columns
-            numeric_cols = df.select_dtypes(include=['number']).columns
-            if len(numeric_cols) > 0:
-                logger.info("\nSummary statistics (numeric columns):")
-                logger.info("\n%s", df[numeric_cols].describe().to_string())
-
-            logger.info("\n%s", "=" * 60)
-            logger.info("Query executed successfully!")
-            logger.info("=" * 60)
+            print("\n" + "=" * 60)
+            print("✓ Query executed successfully!")
+            print("=" * 60)
         else:
-            logger.warning("Query returned 0 rows")
+            print("⚠ Query returned 0 rows")
 
     except KeyboardInterrupt:
-        logger.info("\nInterrupted by user")
+        print("\n✗ Interrupted by user")
         sys.exit(1)
-    except (ValueError, RuntimeError, requests.exceptions.RequestException) as e:
-        # Catch specific exceptions from dax_client and requests
-        logger.error("Error executing query: %s", str(e), exc_info=True)
+    except requests.exceptions.HTTPError as e:
+        # Extract error details from HTTP response
+        status_code = None
+        error_code = "Unknown"
+        
+        if hasattr(e, 'response') and e.response is not None:
+            status_code = e.response.status_code
+            try:
+                error_json = e.response.json()
+                error_code = error_json.get("error", {}).get("code", "Unknown")
+            except (ValueError, KeyError, AttributeError, TypeError):
+                pass
+        
+        # Extract status code from error message if not in response
+        if status_code is None:
+            import re
+            match = re.search(r'(\d{3})', str(e))
+            status_code = match.group(1) if match else "Unknown"
+        
+        print(f"\n✗ Error: {status_code} {error_code}")
+        print(f"  Endpoint: executeQueries")
+        sys.exit(1)
+    except (ValueError, RuntimeError) as e:
+        print(f"\n✗ Error: {type(e).__name__}")
+        print(f"  Reason: {str(e)}")
+        sys.exit(1)
+    except requests.exceptions.RequestException as e:
+        print(f"\n✗ Network Error: {type(e).__name__}")
+        print(f"  Reason: {str(e)}")
         sys.exit(1)
     except Exception as e:  # pylint: disable=broad-exception-caught
-        # Catch any other unexpected errors to provide user-friendly message
-        logger.error("Unexpected error executing query: %s", str(e), exc_info=True)
+        print(f"\n✗ Unexpected error: {type(e).__name__}")
+        print(f"  Reason: {str(e)}")
         sys.exit(1)
 
 

@@ -59,3 +59,17 @@ Thumbs.db
 # Azure Functions
 .python_packages/
 __pycache__/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+*.cover
+.hypothesis/
+
+# Code Quality Tools
+.ruff_cache/
+.mypy_cache/
+.dmypy.json
+dmypy.json

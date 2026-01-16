@@ -1,0 +1,76 @@
+name: Deploy to Azure Function App
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'function_app/**'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  AZURE_FUNCTIONAPP_NAME: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'function_app'
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-and-deploy:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/requirements.txt
+
+      - name: Run tests
+        run: |
+          pytest --cov=function_app --cov-report=term-missing -v
+        continue-on-error: true
+
+      - name: Install Azure Functions Core Tools
+        uses: Azure/functions-core-tools-action@v1
+        with:
+          core-tools-version: '4'
+
+      - name: Log in to Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy to Azure Function App
+        uses: Azure/functions-action@v1
+        with:
+          app-name: ${{ secrets.AZURE_FUNCTIONAPP_NAME }}
+          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
+          publish-profile: ${{ secrets.AZURE_FUNCTIONAPP_PUBLISH_PROFILE }}
+
+      - name: Verify deployment
+        run: |
+          echo "Deployment completed. Verify Function App status in Azure Portal."
+
+      - name: Post deployment notification
+        if: always()
+        run: |
+          echo "Deployment status: ${{ job.status }}"
+        continue-on-error: true

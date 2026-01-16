@@ -8,7 +8,7 @@ import time
 from typing import Dict, Any
 
 from .config import config
-from .dax_client import execute_dax_query
+from .dax_client import execute_dax_query, get_dax_query_from_dataset
 from .scorer import score_customers
 from .sql_client import insert_churn_scores
 from .pbi_client import trigger_dataset_refresh, wait_for_refresh_completion
@@ -38,11 +38,8 @@ def run_monthly_pipeline() -> Dict[str, Any]:
         step = "dax_query"
         logger.info("Executing DAX query...")
 
-        # Get DAX query - in production, this would be stored or passed as parameter
-        # For now, assume it's provided via environment variable or hardcoded
-        dax_query = config.DAX_QUERY_NAME or ""
-        if not dax_query:
-            raise ValueError("DAX query must be provided")
+        # Get DAX query from file (uses config.DAX_QUERY_NAME or defaults to "churn_features")
+        dax_query = get_dax_query_from_dataset()
 
         df = execute_dax_query(dax_query)
         logger.info("DAX query returned %d rows", len(df))

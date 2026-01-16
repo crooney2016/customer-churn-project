@@ -4,8 +4,9 @@ Loads model, preprocesses data, scores, and generates reasons.
 """
 
 import pickle
+from functools import lru_cache
 from pathlib import Path
-from typing import Tuple
+from typing import List, Tuple
 import pandas as pd
 import numpy as np
 import xgboost as xgb
@@ -70,8 +71,12 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     cc_default = pd.Series(["UNKNOWN"] * len(df), index=df.index)
     cc = df["CostCenter"] if "CostCenter" in df.columns else cc_default
 
-    X = pd.concat([X, pd.get_dummies(seg, prefix="Segment")], axis=1)  # pylint: disable=invalid-name
-    X = pd.concat([X, pd.get_dummies(cc, prefix="CostCenter")], axis=1)  # pylint: disable=invalid-name
+    # Combine concat operations for better performance (single concat instead of two)
+    X = pd.concat([  # pylint: disable=invalid-name
+        X,
+        pd.get_dummies(seg, prefix="Segment"),
+        pd.get_dummies(cc, prefix="CostCenter")
+    ], axis=1)
 
     return X
 
@@ -179,7 +184,7 @@ def reason_text(feature: str, mode: str) -> str:
         return f"Favorable {base}"
 
 
-def top_reasons(row_contrib: pd.Series, risk: float, n: int = 3) -> list:
+def top_reasons(row_contrib: pd.Series, risk: float, n: int = 3) -> List[str]:
     """Generate top N reasons from feature contributions."""
     s = row_contrib.drop(labels=["BIAS"], errors="ignore")
 
@@ -198,8 +203,17 @@ def top_reasons(row_contrib: pd.Series, risk: float, n: int = 3) -> list:
     return (risk_reasons + safe_reasons)[:n]
 
 
-def load_model() -> Tuple[object, list]:
-    """Load XGBoost model and model columns."""
+@lru_cache(maxsize=1)
+def load_model() -> Tuple[object, List[str]]:
+    """
+    Load XGBoost model and model columns.
+
+    Cached using lru_cache to prevent reloading model on each invocation.
+    This improves performance for Azure Functions where the model is reused.
+
+    Returns:
+        Tuple of (XGBoost model, list of model column names)
+    """
     model_dir = Path(__file__).parent / "model"
     model_path = model_dir / "churn_model.pkl"
     model_columns_path = model_dir / "model_columns.pkl"
@@ -269,11 +283,14 @@ def score_customers(df: pd.DataFrame) -> pd.DataFrame:
     columns_list = list(X.columns) + ["BIAS"]  # pylint: disable=invalid-name
     contrib_df = pd.DataFrame(contrib, columns=columns_list)  # type: ignore[call-overload]
 
-    reasons_rows = []
-    for i in range(len(X)):  # pylint: disable=invalid-name
-        reasons_rows.append(
-            top_reasons(contrib_df.iloc[i], float(probs[i]), n=3)
-        )
+    # Generate reasons - use list comprehension (cleaner than explicit loop)
+    # Note: This still uses iloc, but the main performance bottleneck was RiskBand.apply()
+    # which we've vectorized. The reasons loop processes each row's feature contributions
+    # which requires row-wise logic, so full vectorization is not straightforward.
+    reasons_rows = [
+        top_reasons(contrib_df.iloc[i], float(probs[i]), n=3)
+        for i in range(len(contrib_df))
+    ]
 
     reasons_df = pd.DataFrame(
         reasons_rows, columns=["Reason_1", "Reason_2", "Reason_3"]  # type: ignore[call-overload]
@@ -282,7 +299,18 @@ def score_customers(df: pd.DataFrame) -> pd.DataFrame:
     # Build output
     output = original_df.copy()
     output["ChurnRiskPct"] = probs
-    output["RiskBand"] = output["ChurnRiskPct"].apply(risk_band)  # type: ignore[union-attr]
+
+    # Vectorize RiskBand calculation using pd.cut (much faster than apply)
+    # pd.cut returns Categorical, convert to string and handle NaN
+    risk_bands = pd.cut(
+        output["ChurnRiskPct"],
+        bins=[0, 0.3, 0.7, 1.0],
+        labels=["C - Low Risk", "B - Medium Risk", "A - High Risk"],
+        include_lowest=True
+    )
+    # Convert to string, handling NaN values (shouldn't occur but defensive)
+    output["RiskBand"] = risk_bands.astype(str).replace("nan", "C - Low Risk")
+
     output = pd.concat([output, reasons_df], axis=1)
 
     # Add all original feature columns

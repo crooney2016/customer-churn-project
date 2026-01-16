@@ -35,7 +35,11 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
 2. **Install dependencies:**
 
    ```bash
+   # Production dependencies
    pip install -r requirements.txt
+   
+   # Development dependencies (for testing and linting)
+   pip install -r requirements-dev.txt
    ```
 
 3. **Configure environment variables:**
@@ -170,7 +174,17 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 ├── scripts/                    # Utility scripts and notebooks
 │   ├── local_scoring.ipynb     # ⭐ Interactive notebook for local scoring (all-in-one workflow)
 │   └── clean-git-history.sh   # Git maintenance script
-├── requirements.txt            # Python dependencies
+├── tests/                      # Test suite
+│   ├── __init__.py
+│   ├── conftest.py            # Shared pytest fixtures
+│   ├── test_scorer.py         # Scoring logic tests
+│   ├── test_config.py         # Configuration tests
+│   ├── test_dax_client.py     # DAX client tests
+│   └── test_sql_client.py     # SQL client tests
+├── requirements.txt            # Production Python dependencies
+├── requirements-dev.txt        # Development dependencies (testing, linting)
+├── pyproject.toml              # Ruff configuration
+├── pytest.ini                  # Pytest configuration
 ├── .env.example                # Environment variable template
 ├── model/                      # XGBoost model files
 │   ├── churn_model.pkl
@@ -183,12 +197,12 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 ├── function_app/              # Azure Function App
 │   ├── __init__.py            # Function entry points
 │   ├── function_app.py        # Pipeline logic
-│   ├── config.py              # Configuration
+│   ├── config.py              # Configuration (Pydantic Settings)
 │   ├── scorer.py              # Model scoring
-│   ├── dax_client.py          # Power BI DAX queries
+│   ├── dax_client.py          # Power BI DAX queries (Tenacity retries)
 │   ├── sql_client.py          # Database writes
-│   ├── pbi_client.py          # Dataset refresh
-│   ├── email_client.py        # Notifications
+│   ├── pbi_client.py          # Dataset refresh (Tenacity retries)
+│   ├── email_client.py        # Notifications (Tenacity retries)
 │   ├── host.json
 │   ├── function.json
 │   └── requirements.txt
@@ -203,6 +217,38 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 4. Idempotent: succeeds completely or rolls back completely
 5. Model packaged in Function, not pulled at runtime
 
+## Testing
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage report
+pytest --cov=function_app --cov-report=html
+
+# Run only unit tests (exclude integration tests)
+pytest -m "not integration"
+
+# Run only integration tests (requires database/Power BI access)
+pytest -m integration
+```
+
+### Code Quality
+
+```bash
+# Lint and format with Ruff
+ruff check .
+ruff format .
+
+# Type checking with Pyright
+pyright function_app/
+
+# Run all quality checks
+ruff check . && ruff format --check . && pyright function_app/
+```
+
 ## Troubleshooting
 
 ### Local Scoring Issues
@@ -216,11 +262,17 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 - **Import errors**: Verify `azure-functions` is in `requirements.txt`
 - **Authentication failures**: Check Service Principal credentials in environment variables
 - **SQL connection errors**: Verify connection string and Managed Identity permissions
+- **Pydantic validation errors**: Check that all required environment variables are set (see config.py)
 
 ### Database Issues
 
 - **Primary key violations**: Check for duplicate (CustomerId, SnapshotDate) pairs
 - **Status calculation errors**: Verify `fnCalculateStatus` function exists
+
+### Testing Issues
+
+- **Import errors in tests**: Ensure `requirements-dev.txt` is installed: `pip install -r requirements-dev.txt`
+- **Coverage below 80%**: Add more unit tests for uncovered code paths
 
 ## Support
 
