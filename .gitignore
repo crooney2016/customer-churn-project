@@ -36,6 +36,9 @@ ENV/
 # Cursor IDE files
 .cursor/
 
+# Internal documentation (analysis, reviews - not for release)
+.internal/
+
 # OS
 .DS_Store
 .DS_Store?

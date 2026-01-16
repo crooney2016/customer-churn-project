@@ -17,30 +17,28 @@
 // - PY (Prior Year): 366-730 days prior to snapshot
 // - Lifetime: All time up to snapshot
 //
-// OUTPUT FEATURES (72 columns)
+// OUTPUT COLUMNS (76 total)
 //
-// Identifiers:
+// Identifiers (7):
 //   - CustomerId, AccountName, Segment, CostCenter
 //   - SnapshotDate, FirstPurchaseDate, LastPurchaseDate
 //
-// Aggregate Metrics:
+// Aggregate Metrics (12):
 //   - Orders_CY, Orders_PY, Orders_Lifetime
 //   - Spend_CY, Spend_PY, Spend_Lifetime
 //   - Units_CY, Units_PY, Units_Lifetime
 //   - AOV_CY, DaysSinceLast, TenureDays
 //
-// Trend Metrics:
-//   - Spend_Trend (CY/PY ratio)
-//   - Orders_Trend (CY/PY ratio)
-//   - Units_Trend (CY/PY ratio)
+// Trend Metrics (3):
+//   - Spend_Trend, Orders_Trend, Units_Trend
 //
-// CUBS Category Metrics (per category: Uniforms, Sparring, Belts, Bags, Customs):
+// CUBS Category Metrics (50 - 10 per category: Uniforms, Sparring, Belts, Bags, Customs):
 //   - {Category}_Units_CY, {Category}_Units_PY, {Category}_Units_Lifetime
 //   - {Category}_Spend_CY, {Category}_Spend_PY, {Category}_Spend_Lifetime
 //   - {Category}_Orders_CY, {Category}_Orders_Lifetime
 //   - {Category}_DaysSinceLast, {Category}_Pct_of_Total_CY
 //
-// Breadth Metrics:
+// Breadth Metrics (4):
 //   - CUBS_Categories_Active_CY (0-5)
 //   - CUBS_Categories_Active_PY (0-5)
 //   - CUBS_Categories_Ever (0-5)
@@ -48,8 +46,11 @@
 //
 // USAGE
 // Production: Automatically uses prior month's end date (runs on 1st of each month).
-// For arbitrary months, use the other DAX file.
-// Export to CSV, combine months into train.csv and validate.csv for modeling.
+// For arbitrary months, use churn_features_dax_multimonth.dax.
+// Export to CSV for scoring pipeline.
+//
+// NOTE: This query returns ONLY the columns required for the scoring model.
+// Extra Customers table columns are excluded to simplify data pipeline.
 //
 // =============================================================================
 
@@ -70,269 +71,361 @@ VAR CustomerBase =
         ) >= SnapshotDate - 365
     )
 
-RETURN
-ADDCOLUMNS(
-    CustomerBase,
+VAR FullData =
+    ADDCOLUMNS(
+        CustomerBase,
 
-    // === IDENTIFIERS ===
-    "SnapshotDate", FORMAT(SnapshotDate, "YYYY-MM-DD"),
-    "FirstPurchaseDate", FORMAT(Customers[FirstOrdered], "YYYY-MM-DD"),
-    "LastPurchaseDate",
-        FORMAT(
-            CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate),
-            "YYYY-MM-DD"
-        ),
+        // === IDENTIFIERS ===
+        "SnapshotDate", FORMAT(SnapshotDate, "YYYY-MM-DD"),
+        "FirstPurchaseDate", FORMAT(Customers[FirstOrdered], "YYYY-MM-DD"),
+        "LastPurchaseDate",
+            FORMAT(
+                CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate),
+                "YYYY-MM-DD"
+            ),
 
-    // === AGGREGATE METRICS ===
-    "Orders_CY",
-        CALCULATE(
-            DISTINCTCOUNT(Sales[transaction_SalesOrderID]),
-            Sales[date_Invoice] > SnapshotDate - 365,
-            Sales[date_Invoice] <= SnapshotDate
-        ),
-    "Orders_PY",
-        CALCULATE(
-            DISTINCTCOUNT(Sales[transaction_SalesOrderID]),
-            Sales[date_Invoice] > SnapshotDate - 730,
-            Sales[date_Invoice] <= SnapshotDate - 365
-        ),
-    "Orders_Lifetime",
-        CALCULATE(
-            DISTINCTCOUNT(Sales[transaction_SalesOrderID]),
-            Sales[date_Invoice] <= SnapshotDate
-        ),
-    "Spend_CY",
-        CALCULATE(
-            SUM(Sales[amount_Sale]),
-            Sales[date_Invoice] > SnapshotDate - 365,
-            Sales[date_Invoice] <= SnapshotDate
-        ),
-    "Spend_PY",
-        CALCULATE(
-            SUM(Sales[amount_Sale]),
-            Sales[date_Invoice] > SnapshotDate - 730,
-            Sales[date_Invoice] <= SnapshotDate - 365
-        ),
-    "Spend_Lifetime",
-        CALCULATE(
-            SUM(Sales[amount_Sale]),
-            Sales[date_Invoice] <= SnapshotDate
-        ),
-    "Units_CY",
-        CALCULATE(
-            SUM(Sales[amount_Qty]),
-            Sales[date_Invoice] > SnapshotDate - 365,
-            Sales[date_Invoice] <= SnapshotDate
-        ),
-    "Units_PY",
-        CALCULATE(
-            SUM(Sales[amount_Qty]),
-            Sales[date_Invoice] > SnapshotDate - 730,
-            Sales[date_Invoice] <= SnapshotDate - 365
-        ),
-    "Units_Lifetime",
-        CALCULATE(
-            SUM(Sales[amount_Qty]),
-            Sales[date_Invoice] <= SnapshotDate
-        ),
-    "AOV_CY",
-        DIVIDE(
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            0
-        ),
-    "DaysSinceLast",
-        DATEDIFF(
-            CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate),
-            SnapshotDate,
-            DAY
-        ),
-    "TenureDays",
-        DATEDIFF(Customers[FirstOrdered], SnapshotDate, DAY),
+        // === AGGREGATE METRICS ===
+        "Orders_CY",
+            CALCULATE(
+                DISTINCTCOUNT(Sales[transaction_SalesOrderID]),
+                Sales[date_Invoice] > SnapshotDate - 365,
+                Sales[date_Invoice] <= SnapshotDate
+            ),
+        "Orders_PY",
+            CALCULATE(
+                DISTINCTCOUNT(Sales[transaction_SalesOrderID]),
+                Sales[date_Invoice] > SnapshotDate - 730,
+                Sales[date_Invoice] <= SnapshotDate - 365
+            ),
+        "Orders_Lifetime",
+            CALCULATE(
+                DISTINCTCOUNT(Sales[transaction_SalesOrderID]),
+                Sales[date_Invoice] <= SnapshotDate
+            ),
+        "Spend_CY",
+            CALCULATE(
+                SUM(Sales[amount_Sale]),
+                Sales[date_Invoice] > SnapshotDate - 365,
+                Sales[date_Invoice] <= SnapshotDate
+            ),
+        "Spend_PY",
+            CALCULATE(
+                SUM(Sales[amount_Sale]),
+                Sales[date_Invoice] > SnapshotDate - 730,
+                Sales[date_Invoice] <= SnapshotDate - 365
+            ),
+        "Spend_Lifetime",
+            CALCULATE(
+                SUM(Sales[amount_Sale]),
+                Sales[date_Invoice] <= SnapshotDate
+            ),
+        "Units_CY",
+            CALCULATE(
+                SUM(Sales[amount_Qty]),
+                Sales[date_Invoice] > SnapshotDate - 365,
+                Sales[date_Invoice] <= SnapshotDate
+            ),
+        "Units_PY",
+            CALCULATE(
+                SUM(Sales[amount_Qty]),
+                Sales[date_Invoice] > SnapshotDate - 730,
+                Sales[date_Invoice] <= SnapshotDate - 365
+            ),
+        "Units_Lifetime",
+            CALCULATE(
+                SUM(Sales[amount_Qty]),
+                Sales[date_Invoice] <= SnapshotDate
+            ),
+        "AOV_CY",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                0
+            ),
+        "DaysSinceLast",
+            DATEDIFF(
+                CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate),
+                SnapshotDate,
+                DAY
+            ),
+        "TenureDays",
+            DATEDIFF(Customers[FirstOrdered], SnapshotDate, DAY),
 
-    // === TREND METRICS ===
-    "Spend_Trend",
-        DIVIDE(
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365),
-            BLANK()
-        ),
-    "Orders_Trend",
-        DIVIDE(
-            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365),
-            BLANK()
-        ),
-    "Units_Trend",
-        DIVIDE(
-            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365),
-            BLANK()
-        ),
+        // === TREND METRICS ===
+        "Spend_Trend",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365),
+                BLANK()
+            ),
+        "Orders_Trend",
+            DIVIDE(
+                CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365),
+                BLANK()
+            ),
+        "Units_Trend",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365),
+                BLANK()
+            ),
 
-    // === UNIFORMS ===
-    "Uniforms_Units_CY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Units_PY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Units_Lifetime",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Spend_CY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Spend_PY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Spend_Lifetime",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Orders_CY",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_Orders_Lifetime",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-    "Uniforms_DaysSinceLast",
-        DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}), SnapshotDate, DAY),
-    "Uniforms_Pct_of_Total_CY",
-        DIVIDE(
+        // === UNIFORMS ===
+        "Uniforms_Units_CY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_Units_PY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_Units_Lifetime",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_Spend_CY",
             CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            0
-        ),
+        "Uniforms_Spend_PY",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_Spend_Lifetime",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_Orders_CY",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_Orders_Lifetime",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+        "Uniforms_DaysSinceLast",
+            DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}), SnapshotDate, DAY),
+        "Uniforms_Pct_of_Total_CY",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}),
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                0
+            ),
 
-    // === SPARRING ===
-    "Sparring_Units_CY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Units_PY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Units_Lifetime",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Spend_CY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Spend_PY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Spend_Lifetime",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Orders_CY",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_Orders_Lifetime",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-    "Sparring_DaysSinceLast",
-        DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] IN {"Sparring", "Protective Accessories"}), SnapshotDate, DAY),
-    "Sparring_Pct_of_Total_CY",
-        DIVIDE(
+        // === SPARRING ===
+        "Sparring_Units_CY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_Units_PY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_Units_Lifetime",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_Spend_CY",
             CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            0
-        ),
+        "Sparring_Spend_PY",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_Spend_Lifetime",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_Orders_CY",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_Orders_Lifetime",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
+        "Sparring_DaysSinceLast",
+            DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] IN {"Sparring", "Protective Accessories"}), SnapshotDate, DAY),
+        "Sparring_Pct_of_Total_CY",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}),
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                0
+            ),
 
-    // === BELTS ===
-    "Belts_Units_CY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-    "Belts_Units_PY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts"),
-    "Belts_Units_Lifetime",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-    "Belts_Spend_CY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-    "Belts_Spend_PY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts"),
-    "Belts_Spend_Lifetime",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-    "Belts_Orders_CY",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-    "Belts_Orders_Lifetime",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-    "Belts_DaysSinceLast",
-        DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] = "Belts"), SnapshotDate, DAY),
-    "Belts_Pct_of_Total_CY",
-        DIVIDE(
+        // === BELTS ===
+        "Belts_Units_CY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
+        "Belts_Units_PY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts"),
+        "Belts_Units_Lifetime",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
+        "Belts_Spend_CY",
             CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            0
-        ),
+        "Belts_Spend_PY",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts"),
+        "Belts_Spend_Lifetime",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
+        "Belts_Orders_CY",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
+        "Belts_Orders_Lifetime",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
+        "Belts_DaysSinceLast",
+            DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] = "Belts"), SnapshotDate, DAY),
+        "Belts_Pct_of_Total_CY",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts"),
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                0
+            ),
 
-    // === BAGS ===
-    "Bags_Units_CY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-    "Bags_Units_PY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags"),
-    "Bags_Units_Lifetime",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-    "Bags_Spend_CY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-    "Bags_Spend_PY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags"),
-    "Bags_Spend_Lifetime",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-    "Bags_Orders_CY",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-    "Bags_Orders_Lifetime",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-    "Bags_DaysSinceLast",
-        DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] = "Training Bags"), SnapshotDate, DAY),
-    "Bags_Pct_of_Total_CY",
-        DIVIDE(
+        // === BAGS ===
+        "Bags_Units_CY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
+        "Bags_Units_PY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags"),
+        "Bags_Units_Lifetime",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
+        "Bags_Spend_CY",
             CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            0
-        ),
+        "Bags_Spend_PY",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags"),
+        "Bags_Spend_Lifetime",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
+        "Bags_Orders_CY",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
+        "Bags_Orders_Lifetime",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
+        "Bags_DaysSinceLast",
+            DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[Department] = "Training Bags"), SnapshotDate, DAY),
+        "Bags_Pct_of_Total_CY",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags"),
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                0
+            ),
 
-    // === CUSTOMS ===
-    "Customs_Units_CY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Units_PY",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Units_Lifetime",
-        CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Spend_CY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Spend_PY",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Spend_Lifetime",
-        CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Orders_CY",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_Orders_Lifetime",
-        CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-    "Customs_DaysSinceLast",
-        DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}), SnapshotDate, DAY),
-    "Customs_Pct_of_Total_CY",
-        DIVIDE(
+        // === CUSTOMS ===
+        "Customs_Units_CY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_Units_PY",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_Units_Lifetime",
+            CALCULATE(SUM(Sales[amount_Qty]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_Spend_CY",
             CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
-            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
-            0
-        ),
+        "Customs_Spend_PY",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_Spend_Lifetime",
+            CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_Orders_CY",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_Orders_Lifetime",
+            CALCULATE(DISTINCTCOUNT(Sales[transaction_SalesOrderID]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+        "Customs_DaysSinceLast",
+            DATEDIFF(CALCULATE(MAX(Sales[date_Invoice]), Sales[date_Invoice] <= SnapshotDate, Sales[amount_Sale] > 0, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}), SnapshotDate, DAY),
+        "Customs_Pct_of_Total_CY",
+            DIVIDE(
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}),
+                CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate),
+                0
+            ),
 
-    // === BREADTH METRICS ===
-    "CUBS_Categories_Active_CY",
-        (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0)),
+        // === BREADTH METRICS ===
+        "CUBS_Categories_Active_CY",
+            (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0)),
 
-    "CUBS_Categories_Active_PY",
-        (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0)),
+        "CUBS_Categories_Active_PY",
+            (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0)),
 
-    "CUBS_Categories_Ever",
-        (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0)),
+        "CUBS_Categories_Ever",
+            (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0)),
 
-    "CUBS_Categories_Trend",
-        (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags") > 0, 1, 0))
-        + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0))
-        - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
-        - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
-        - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts") > 0, 1, 0))
-        - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags") > 0, 1, 0))
-        - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0))
+        "CUBS_Categories_Trend",
+            (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Belts") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[Department] = "Training Bags") > 0, 1, 0))
+            + (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 365, Sales[date_Invoice] <= SnapshotDate, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0))
+            - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Uniforms", "Student Uniforms", "Specialty Uniforms"}) > 0, 1, 0))
+            - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] IN {"Sparring", "Protective Accessories"}) > 0, 1, 0))
+            - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Belts") > 0, 1, 0))
+            - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[Department] = "Training Bags") > 0, 1, 0))
+            - (IF(CALCULATE(SUM(Sales[amount_Sale]), Sales[date_Invoice] > SnapshotDate - 730, Sales[date_Invoice] <= SnapshotDate - 365, Product[BrandInternalName] IN {"CUSTOMFEE", "CUSTOMPRG", "CUSTOMSTK"}) > 0, 1, 0))
+    )
+
+// Return only the columns required for scoring (76 total)
+// This excludes extra Customers table columns that are not used in the model
+RETURN
+SELECTCOLUMNS(
+    FullData,
+    // Identifiers (7)
+    "CustomerId", Customers[account_Order],
+    "AccountName", Customers[account_Name],
+    "Segment", Customers[Segment],
+    "CostCenter", Customers[Cost Center],
+    "SnapshotDate", [SnapshotDate],
+    "FirstPurchaseDate", [FirstPurchaseDate],
+    "LastPurchaseDate", [LastPurchaseDate],
+    // Aggregate Metrics (12)
+    "Orders_CY", [Orders_CY],
+    "Orders_PY", [Orders_PY],
+    "Orders_Lifetime", [Orders_Lifetime],
+    "Spend_CY", [Spend_CY],
+    "Spend_PY", [Spend_PY],
+    "Spend_Lifetime", [Spend_Lifetime],
+    "Units_CY", [Units_CY],
+    "Units_PY", [Units_PY],
+    "Units_Lifetime", [Units_Lifetime],
+    "AOV_CY", [AOV_CY],
+    "DaysSinceLast", [DaysSinceLast],
+    "TenureDays", [TenureDays],
+    // Trend Metrics (3)
+    "Spend_Trend", [Spend_Trend],
+    "Orders_Trend", [Orders_Trend],
+    "Units_Trend", [Units_Trend],
+    // Uniforms (10)
+    "Uniforms_Units_CY", [Uniforms_Units_CY],
+    "Uniforms_Units_PY", [Uniforms_Units_PY],
+    "Uniforms_Units_Lifetime", [Uniforms_Units_Lifetime],
+    "Uniforms_Spend_CY", [Uniforms_Spend_CY],
+    "Uniforms_Spend_PY", [Uniforms_Spend_PY],
+    "Uniforms_Spend_Lifetime", [Uniforms_Spend_Lifetime],
+    "Uniforms_Orders_CY", [Uniforms_Orders_CY],
+    "Uniforms_Orders_Lifetime", [Uniforms_Orders_Lifetime],
+    "Uniforms_DaysSinceLast", [Uniforms_DaysSinceLast],
+    "Uniforms_Pct_of_Total_CY", [Uniforms_Pct_of_Total_CY],
+    // Sparring (10)
+    "Sparring_Units_CY", [Sparring_Units_CY],
+    "Sparring_Units_PY", [Sparring_Units_PY],
+    "Sparring_Units_Lifetime", [Sparring_Units_Lifetime],
+    "Sparring_Spend_CY", [Sparring_Spend_CY],
+    "Sparring_Spend_PY", [Sparring_Spend_PY],
+    "Sparring_Spend_Lifetime", [Sparring_Spend_Lifetime],
+    "Sparring_Orders_CY", [Sparring_Orders_CY],
+    "Sparring_Orders_Lifetime", [Sparring_Orders_Lifetime],
+    "Sparring_DaysSinceLast", [Sparring_DaysSinceLast],
+    "Sparring_Pct_of_Total_CY", [Sparring_Pct_of_Total_CY],
+    // Belts (10)
+    "Belts_Units_CY", [Belts_Units_CY],
+    "Belts_Units_PY", [Belts_Units_PY],
+    "Belts_Units_Lifetime", [Belts_Units_Lifetime],
+    "Belts_Spend_CY", [Belts_Spend_CY],
+    "Belts_Spend_PY", [Belts_Spend_PY],
+    "Belts_Spend_Lifetime", [Belts_Spend_Lifetime],
+    "Belts_Orders_CY", [Belts_Orders_CY],
+    "Belts_Orders_Lifetime", [Belts_Orders_Lifetime],
+    "Belts_DaysSinceLast", [Belts_DaysSinceLast],
+    "Belts_Pct_of_Total_CY", [Belts_Pct_of_Total_CY],
+    // Bags (10)
+    "Bags_Units_CY", [Bags_Units_CY],
+    "Bags_Units_PY", [Bags_Units_PY],
+    "Bags_Units_Lifetime", [Bags_Units_Lifetime],
+    "Bags_Spend_CY", [Bags_Spend_CY],
+    "Bags_Spend_PY", [Bags_Spend_PY],
+    "Bags_Spend_Lifetime", [Bags_Spend_Lifetime],
+    "Bags_Orders_CY", [Bags_Orders_CY],
+    "Bags_Orders_Lifetime", [Bags_Orders_Lifetime],
+    "Bags_DaysSinceLast", [Bags_DaysSinceLast],
+    "Bags_Pct_of_Total_CY", [Bags_Pct_of_Total_CY],
+    // Customs (10)
+    "Customs_Units_CY", [Customs_Units_CY],
+    "Customs_Units_PY", [Customs_Units_PY],
+    "Customs_Units_Lifetime", [Customs_Units_Lifetime],
+    "Customs_Spend_CY", [Customs_Spend_CY],
+    "Customs_Spend_PY", [Customs_Spend_PY],
+    "Customs_Spend_Lifetime", [Customs_Spend_Lifetime],
+    "Customs_Orders_CY", [Customs_Orders_CY],
+    "Customs_Orders_Lifetime", [Customs_Orders_Lifetime],
+    "Customs_DaysSinceLast", [Customs_DaysSinceLast],
+    "Customs_Pct_of_Total_CY", [Customs_Pct_of_Total_CY],
+    // Breadth Metrics (4)
+    "CUBS_Categories_Active_CY", [CUBS_Categories_Active_CY],
+    "CUBS_Categories_Active_PY", [CUBS_Categories_Active_PY],
+    "CUBS_Categories_Ever", [CUBS_Categories_Ever],
+    "CUBS_Categories_Trend", [CUBS_Categories_Trend]
 )
 
-ORDER BY Customers[account_Order]
+ORDER BY [CustomerId]

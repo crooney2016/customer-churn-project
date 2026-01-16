@@ -71,6 +71,16 @@ class Config(BaseSettings):
         description="Name of DAX query file (without .dax extension)",
     )
 
+    # Azure Blob Storage
+    BLOB_STORAGE_CONNECTION_STRING: str = Field(
+        default="",
+        description="Azure Blob Storage connection string",
+    )
+    BLOB_STORAGE_CONTAINER_NAME: str = Field(
+        default="churn-feature-data",
+        description="Blob container name for feature data",
+    )
+
     # Email (Microsoft Graph API)
     EMAIL_TENANT_ID: str = Field(
         ...,

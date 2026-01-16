@@ -2,54 +2,52 @@
 Pytest configuration and shared fixtures.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 import pandas as pd
-import numpy as np
+import pytest
 
 
 @pytest.fixture
-def mock_sql_connection():
+def mock_sql_connection(mocker):
     """
     Mock SQL connection and cursor for testing SQL operations.
 
     Returns:
         Tuple of (mock_connection, mock_cursor)
     """
-    mock_conn = MagicMock()
-    mock_cursor = MagicMock()
+    mock_conn = mocker.MagicMock()
+    mock_cursor = mocker.MagicMock()
     mock_conn.cursor.return_value = mock_cursor
     mock_conn.commit.return_value = None
     mock_conn.rollback.return_value = None
 
-    with patch("function_app.sql_client.get_connection", return_value=mock_conn):
-        yield mock_conn, mock_cursor
+    mocker.patch("function_app.sql_client.get_connection", return_value=mock_conn)
+    yield mock_conn, mock_cursor
 
 
 @pytest.fixture
-def mock_pbi_client():
+def mock_pbi_client(mocker):
     """
     Mock Power BI client for testing DAX queries and dataset refresh.
 
     Returns:
         Mock object for Power BI client functions
     """
-    with patch("function_app.dax_client.get_access_token", return_value="mock_token"):
-        with patch("function_app.pbi_client.get_access_token", return_value="mock_token"):
-            yield MagicMock()
+    mocker.patch("function_app.dax_client.get_access_token", return_value="mock_token")
+    mocker.patch("function_app.pbi_client.get_access_token", return_value="mock_token")
+    yield mocker.MagicMock()
 
 
 @pytest.fixture
-def mock_email_client():
+def mock_email_client(mocker):
     """
     Mock email client for testing email notifications.
 
     Returns:
         Mock object for email client functions
     """
-    with patch("function_app.email_client.get_graph_access_token", return_value="mock_token"):
-        with patch("function_app.email_client.send_email"):
-            yield MagicMock()
+    mocker.patch("function_app.email_client.get_graph_access_token", return_value="mock_token")
+    mocker.patch("function_app.email_client.send_email")
+    yield mocker.MagicMock()
 
 
 @pytest.fixture

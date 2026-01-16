@@ -2,9 +2,14 @@
 Unit tests for config.py module.
 """
 
+import importlib
+import sys
+from types import ModuleType
+
 import pytest
-import os
-from function_app.config import Config
+
+# Import to ensure module is in sys.modules for reload()
+import function_app.config  # pylint: disable=unused-import
 
 
 def test_config_loads_from_env(monkeypatch):
@@ -21,12 +26,12 @@ def test_config_loads_from_env(monkeypatch):
     monkeypatch.setenv("EMAIL_SENDER", "test@example.com")
     monkeypatch.setenv("EMAIL_RECIPIENTS", "recipient1@example.com,recipient2@example.com")
 
-    # Need to reload config module to pick up new env vars
-    import importlib
-    import function_app.config
-    importlib.reload(function_app.config)
+    # Reload config module to pick up new env vars
+    config_module: ModuleType = importlib.reload(
+        sys.modules['function_app.config']
+    )
 
-    config = function_app.config.Config()
+    config = config_module.Config()
     assert config.SQL_CONNECTION_STRING == "test_conn_string"
     assert config.PBI_TENANT_ID == "test_tenant_id"
     assert config.EMAIL_RECIPIENTS == "recipient1@example.com,recipient2@example.com"
@@ -52,14 +57,14 @@ def test_config_raises_on_missing_required(monkeypatch):
     for var in required_vars:
         monkeypatch.delenv(var, raising=False)
 
-    # Need to reload config module
-    import importlib
-    import function_app.config
-    importlib.reload(function_app.config)
+    # Reload config module
+    config_module: ModuleType = importlib.reload(
+        sys.modules['function_app.config']
+    )
 
     # Pydantic raises ValidationError, but our code wraps it in ValueError
-    with pytest.raises((ValueError, Exception)):  # Either ValidationError or ValueError wrapper
-        function_app.config.Config()
+    with pytest.raises((ValueError, Exception)):
+        config_module.Config()
 
 
 def test_config_get_email_recipients():
@@ -97,9 +102,9 @@ def test_config_dax_query_name_optional(monkeypatch):
     # Don't set DAX_QUERY_NAME
     monkeypatch.delenv("DAX_QUERY_NAME", raising=False)
 
-    import importlib
-    import function_app.config
-    importlib.reload(function_app.config)
+    config_module: ModuleType = importlib.reload(
+        sys.modules['function_app.config']
+    )
 
-    config = function_app.config.Config()
+    config = config_module.Config()
     assert config.DAX_QUERY_NAME is None

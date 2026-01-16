@@ -283,14 +283,16 @@ def score_customers(df: pd.DataFrame) -> pd.DataFrame:
     columns_list = list(X.columns) + ["BIAS"]  # pylint: disable=invalid-name
     contrib_df = pd.DataFrame(contrib, columns=columns_list)  # type: ignore[call-overload]
 
-    # Generate reasons - use list comprehension (cleaner than explicit loop)
-    # Note: This still uses iloc, but the main performance bottleneck was RiskBand.apply()
-    # which we've vectorized. The reasons loop processes each row's feature contributions
-    # which requires row-wise logic, so full vectorization is not straightforward.
-    reasons_rows = [
-        top_reasons(contrib_df.iloc[i], float(probs[i]), n=3)
-        for i in range(len(contrib_df))
-    ]
+    # Generate reasons using itertuples() for better performance
+    # itertuples() is 10-100x faster than iloc[i] index-based access
+    # We convert the named tuple to a Series for top_reasons() which needs sort_values()
+    contrib_columns = contrib_df.columns.tolist()
+
+    reasons_rows = []
+    for row_tuple, prob in zip(contrib_df.itertuples(index=False), probs):
+        # Convert named tuple to Series for top_reasons function
+        row_series = pd.Series(row_tuple, index=contrib_columns)
+        reasons_rows.append(top_reasons(row_series, float(prob), n=3))
 
     reasons_df = pd.DataFrame(
         reasons_rows, columns=["Reason_1", "Reason_2", "Reason_3"]  # type: ignore[call-overload]

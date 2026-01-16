@@ -2,7 +2,7 @@
 
 Automated scripts for fixing common markdownlint errors following `.cursor/rules/markdown.md` guidelines.
 
-#### For comprehensive linting automation (Python + Markdown), see [`README_LINTING.md`](README_LINTING.md)
+## For comprehensive linting automation (Python + Markdown), see [`README_LINTING.md`](README_LINTING.md)
 
 ## Quick Start
 

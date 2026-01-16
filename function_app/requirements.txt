@@ -1,6 +1,7 @@
 azure-functions>=1.18.0
 azure-identity>=1.15.0
-pyodbc>=5.0.0
+azure-storage-blob>=12.19.0
+pymssql>=2.2.0
 xgboost>=2.0.0
 pandas>=2.0.0
 numpy>=1.24.0

@@ -2,7 +2,7 @@
 
 Documentation for Python linting convenience scripts.
 
-#### For comprehensive linting automation (Python + Markdown), see [`README_LINTING.md`](README_LINTING.md)
+## For comprehensive linting automation (Python + Markdown), see [`README_LINTING.md`](README_LINTING.md)
 
 ## Script
 
@@ -17,14 +17,12 @@ Can operate in two modes:
 
 #### What it does
 
-#### Comprehensive Mode
+#### Comprehensive Mode (`fix-python-lint.py`)
 
 1. Runs `ruff check --fix` - Auto-fixes linting issues (imports, style, etc.)
 1. Runs `ruff format` - Formats code according to project style
 1. Optionally runs `pyright` - Type checking (read-only, no fixes)
 1. Optionally runs `pylint` - Style checking (read-only, no fixes)
-
-#### Specific Mode (`--json`)
 
 - Fixes common pylint errors from JSON diagnostics:
   - **W1309**: f-string-without-interpolation (convert to regular string)
@@ -55,8 +53,6 @@ See [`README_LINTING.md`](README_LINTING.md) for comprehensive linting automatio
 
 ## Usage
 
-### Comprehensive Mode (Default)
-
 ```bash
 # Fix all Python files in function_app/
 python3 scripts/fix-python-lint.py function_app/
@@ -67,8 +63,6 @@ python3 scripts/fix-python-lint.py function_app/scorer.py
 # Fix all Python files (default target)
 python3 scripts/fix-python-lint.py
 ```
-
-## Specific Mode (JSON Diagnostics)
 
 Fix only errors from JSON diagnostics (e.g., from VS Code or pylint):
 
@@ -83,7 +77,7 @@ python3 scripts/fix-python-lint.py --json -
 pylint --output-format=json file.py | python3 scripts/fix-python-lint.py --json -
 ```
 
-#### JSON Input Format
+## JSON Input Format
 
 Expects JSON array of error objects (same format as VS Code diagnostics):
 

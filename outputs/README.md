@@ -46,6 +46,7 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
    ```
 
 1. **Verify model files exist:**
+
 - `model/churn_model.pkl`
 - `model/model_columns.pkl`
 
@@ -91,6 +92,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
    ```
 
 1. **Verify:**
+
 - Table: `dbo.ChurnScoresHistory`
 - View: `dbo.vwCustomerCurrent`
 - Function: `dbo.fnCalculateStatus`
@@ -107,6 +109,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
 ### Deployment Steps
 
 1. **Set environment variables in Function App:**
+
 - All variables from `.env.example`
 - Set via Azure Portal → Configuration → Application settings
 
@@ -128,6 +131,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
    ```
 
 1. **Monitor:**
+
 - Application Insights for logs and traces
 - Function App → Monitor for execution history
 - Email notifications for success/failure
@@ -166,7 +170,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
 │   ├── host.json
 │   ├── function.json
 │   └── requirements.txt
-└── outputs/                    # Local scoring outputs
+└── outputs/                    # Local scoring outputs and code reviews
 ```
 
 ## Key Constraints

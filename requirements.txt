@@ -10,8 +10,8 @@
 azure-functions>=1.18.0
 azure-identity>=1.15.0
 
-# Database
-pyodbc>=5.0.0
+# Database (uses FreeTDS, no ODBC driver required)
+pymssql>=2.2.0
 
 # Machine Learning
 xgboost>=2.0.0

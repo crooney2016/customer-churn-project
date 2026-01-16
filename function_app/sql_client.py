@@ -1,88 +1,169 @@
 """
 SQL client for writing churn scores to database.
-Uses azure-identity for authentication and pyodbc for connections.
+Uses pymssql (FreeTDS-based, no ODBC driver required) for connections.
 """
 
 import logging
 import time
-from datetime import datetime, date
-from typing import Any, Optional, Union
+from datetime import datetime
+from typing import List
 import pandas as pd
-import pyodbc
+import pymssql
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+    before_sleep_log,
+)
 
 from .config import config
 
 # Configure logging per logging.md
 logger = logging.getLogger(__name__)
 
+# Connection settings for Azure SQL Serverless (handles cold starts)
+CONNECTION_TIMEOUT = 60  # seconds - serverless may take up to 60s to wake
+MAX_CONNECTION_RETRIES = 3
+BASE_RETRY_DELAY = 5.0  # seconds
 
-def get_connection() -> pyodbc.Connection:
-    """Get SQL connection using connection string from .env (SQL Server authentication)."""
+# SQL table and procedure names
+STAGING_TABLE = "dbo.ChurnScoresStaging"
+MAIN_TABLE = "dbo.ChurnScoresHistory"
+MERGE_PROCEDURE = "dbo.spMergeChurnScoresFromStaging"
+
+# Required columns for SQL schema (NOT NULL columns)
+REQUIRED_COLUMNS = ["CustomerId", "SnapshotDate"]
+
+
+def _parse_connection_string(connection_string: str) -> dict:
+    """
+    Parse connection string to pymssql.connect() parameters.
+    
+    Expected format: Server=hostname;Port=1433;Database=dbname;UID=username;PWD=password;
+    
+    All parameters except Server are optional (Port defaults to 1433).
+    """
+    params = {}
+    for part in connection_string.split(';'):
+        part = part.strip()
+        if '=' in part:
+            key, value = part.split('=', 1)
+            key = key.strip().lower()
+            value = value.strip()
+            
+            if key == 'server':
+                params['server'] = value
+            elif key == 'port':
+                params['port'] = int(value)
+            elif key in ['database', 'initial catalog']:
+                params['database'] = value
+            elif key in ['uid', 'user id', 'user']:
+                params['user'] = value
+            elif key in ['pwd', 'password']:
+                params['password'] = value
+    
+    return params
+
+
+@retry(
+    stop=stop_after_attempt(MAX_CONNECTION_RETRIES),
+    wait=wait_exponential(multiplier=BASE_RETRY_DELAY, min=BASE_RETRY_DELAY, max=30),
+    retry=retry_if_exception_type((pymssql.OperationalError, pymssql.DatabaseError, pymssql.Error)),
+    before_sleep=before_sleep_log(logger, logging.WARNING),
+    reraise=True,
+)
+def get_connection() -> pymssql.Connection:
+    """
+    Get SQL connection using connection string from .env (SQL Server authentication).
+
+    Includes retry logic for Azure SQL Serverless cold starts which can take
+    up to 60 seconds to resume from paused state.
+    
+    Connection string format: Server=hostname;Port=1433;Database=dbname;UID=username;PWD=password;
+    
+    Returns:
+        pymssql.Connection: Database connection object
+    """
     logger.debug("Establishing SQL database connection")
     connection_string = config.SQL_CONNECTION_STRING
-
-    # Use direct SQL Server authentication from connection string in .env
-    # Connection string format:
-    # Driver={ODBC Driver 18 for SQL Server};Server=...;Database=...;UID=...;PWD=...;
-    conn = pyodbc.connect(connection_string, timeout=30)
+    
+    # Parse connection string to pymssql parameters
+    conn_params = _parse_connection_string(connection_string)
+    
+    # pymssql.connect() uses keyword arguments
+    conn = pymssql.connect(**conn_params, timeout=CONNECTION_TIMEOUT)
     logger.debug("SQL connection established successfully")
 
     return conn
 
 
-def insert_churn_scores(df: pd.DataFrame, batch_size: int = 1000) -> int:
+def _validate_dataframe_schema(df: pd.DataFrame, required_columns: List[str]) -> None:
     """
-    Insert churn scores into database using stored procedure in batches.
+    Validate DataFrame has required columns for SQL insert.
 
     Args:
-        df: DataFrame with scored data (must include all required columns)
-        batch_size: Number of rows to process per batch (default: 1000)
+        df: DataFrame to validate
+        required_columns: List of required column names
+
+    Raises:
+        ValueError: If required columns are missing
+    """
+    missing = set(required_columns) - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"DataFrame missing required columns: {sorted(missing)}. "
+            f"Available columns: {sorted(df.columns)}"
+        )
+
+
+def insert_churn_scores(df: pd.DataFrame, batch_size: int = 5000) -> int:
+    """
+    Insert churn scores into database using staging table pattern with bulk inserts.
+
+    Uses staging table + MERGE pattern for efficient bulk operations:
+    1. Bulk insert into ChurnScoresStaging using executemany()
+    2. Call spMergeChurnScoresFromStaging to MERGE into main table
+    3. Truncate staging table
+    4. All wrapped in a single transaction
+
+    Args:
+        df: DataFrame with scored data (columns must match SQL schema)
+        batch_size: Number of rows to process per batch (default: 5000)
 
     Returns:
         Number of rows inserted/updated
+
+    Raises:
+        ValueError: If DataFrame is missing required columns
     """
     conn = None
     step = "sql_write"
-    rows_processed = 0
     total_rows = len(df)
+    rows_processed = 0
 
-    # Helper function to safely convert date
-    def safe_date_convert(val: Union[str, date, datetime, int, float, None]) -> Optional[date]:
-        if val is None:
-            return None
-        try:
-            if pd.isna(val):  # type: ignore[arg-type]
-                return None
-            dt = pd.to_datetime(val)  # type: ignore[arg-type]
-            return dt.date()  # type: ignore[return-value]
-        except (ValueError, TypeError):
-            return None
+    if total_rows == 0:
+        logger.warning("Step '%s': DataFrame is empty, nothing to insert", step)
+        return 0
 
-    # Helper function to safely convert to float
-    def safe_float(val: Union[str, int, float, None]) -> Optional[float]:
-        if val is None:
-            return None
-        try:
-            if pd.isna(val):  # type: ignore[arg-type]
-                return None
-            return float(val)  # type: ignore[arg-type]
-        except (ValueError, TypeError):
-            return None
-
-    # Helper function to safely convert to string
-    def safe_str(val: Union[str, int, float, None]) -> Optional[str]:
-        if val is None:
-            return None
-        try:
-            if pd.isna(val):  # type: ignore[arg-type]
-                return None
-            return str(val)  # type: ignore[arg-type]
-        except (ValueError, TypeError):
-            return None
+    # Validate required columns before attempting insert
+    try:
+        _validate_dataframe_schema(df, REQUIRED_COLUMNS)
+        logger.debug(
+            "Step '%s': Schema validation passed - required columns present",
+            step
+        )
+    except ValueError as e:
+        logger.error(
+            "Step '%s': Schema validation failed: %s",
+            step,
+            str(e)
+        )
+        raise
 
     try:
         logger.info(
-            "Step '%s': Starting database write for %d rows (batch size: %d)",
+            "Step '%s': Starting bulk insert for %d rows (batch size: %d)",
             step,
             total_rows,
             batch_size
@@ -93,10 +174,17 @@ def insert_churn_scores(df: pd.DataFrame, batch_size: int = 1000) -> int:
 
         start_time = time.time()
 
-        # Helper function to safely get attribute from named tuple (defined outside loop for performance)
-        def get_attr(row_obj: Any, attr: str, default: Any = None) -> Any:
-            """Safely get attribute from named tuple, returning default if missing."""
-            return getattr(row_obj, attr, default)
+        # Build INSERT statement dynamically from DataFrame columns
+        # SQL client is schema-agnostic - works with any DataFrame structure
+        columns = ', '.join(df.columns)
+        placeholders = ', '.join(['?' for _ in df.columns])
+        insert_sql = f"INSERT INTO {STAGING_TABLE} ({columns}) VALUES ({placeholders})"
+
+        logger.debug(
+            "Step '%s': Built INSERT statement for %d columns",
+            step,
+            len(df.columns)
+        )
 
         # Process in batches
         for batch_start in range(0, total_rows, batch_size):
@@ -111,118 +199,68 @@ def insert_churn_scores(df: pd.DataFrame, batch_size: int = 1000) -> int:
                 total_rows
             )
 
-            # Use itertuples() instead of iterrows() for 10-100× better performance
-            # itertuples returns named tuples with column names as attributes
+            # Prepare data as list of tuples for executemany()
+            # Convert each row to tuple, handling NaN/None values
+            data_tuples = []
             for row in batch_df.itertuples(index=False):
+                row_tuple = []
+                for val in row:
+                    # Convert NaN/None to None (SQL NULL)
+                    if pd.isna(val):
+                        row_tuple.append(None)
+                    # Convert datetime to date if needed
+                    elif isinstance(val, (datetime, pd.Timestamp)):
+                        row_tuple.append(val.date())
+                    else:
+                        row_tuple.append(val)
+                data_tuples.append(tuple(row_tuple))
 
-                # Prepare parameters for stored procedure
-                # Extract values and handle None properly
-                snapshot_date_val = get_attr(row, 'SnapshotDate')
-                first_purchase_val = get_attr(row, 'FirstPurchaseDate')
-                last_purchase_val = get_attr(row, 'LastPurchaseDate')
-                churn_risk_val = get_attr(row, 'ChurnRiskPct')
-                risk_band_val = get_attr(row, 'RiskBand')
-                reason_1_val = get_attr(row, 'Reason_1')
-                reason_2_val = get_attr(row, 'Reason_2')
-                reason_3_val = get_attr(row, 'Reason_3')
-                account_name_val = get_attr(row, 'AccountName')
-                segment_val = get_attr(row, 'Segment')
-                cost_center_val = get_attr(row, 'CostCenter')
-                customer_id_val = get_attr(row, 'CustomerId', '')
+            # Bulk insert using executemany() - much faster than row-by-row
+            cursor.executemany(insert_sql, data_tuples)
+            rows_processed += len(data_tuples)
 
-                params = {
-                    '@CustomerId': str(customer_id_val),
-                    '@SnapshotDate': safe_date_convert(snapshot_date_val),
-                    '@ChurnRiskPct': safe_float(churn_risk_val),
-                    '@RiskBand': safe_str(risk_band_val),
-                    '@Reason_1': safe_str(reason_1_val),
-                    '@Reason_2': safe_str(reason_2_val),
-                    '@Reason_3': safe_str(reason_3_val),
-                    '@ScoredAt': datetime.now(),
-                    '@AccountName': safe_str(account_name_val),
-                    '@Segment': safe_str(segment_val),
-                    '@CostCenter': safe_str(cost_center_val),
-                    '@FirstPurchaseDate': safe_date_convert(first_purchase_val),
-                    '@LastPurchaseDate': safe_date_convert(last_purchase_val),
-                }
-
-                # Add all feature columns
-                feature_cols = [
-                    'Orders_CY', 'Orders_PY', 'Orders_Lifetime',
-                    'Spend_CY', 'Spend_PY', 'Spend_Lifetime',
-                    'Units_CY', 'Units_PY', 'Units_Lifetime',
-                    'AOV_CY', 'DaysSinceLast', 'TenureDays',
-                    'Spend_Trend', 'Orders_Trend', 'Units_Trend',
-                    'Uniforms_Units_CY', 'Uniforms_Units_PY', 'Uniforms_Units_Lifetime',
-                    'Uniforms_Spend_CY', 'Uniforms_Spend_PY', 'Uniforms_Spend_Lifetime',
-                    'Uniforms_Orders_CY', 'Uniforms_Orders_Lifetime',
-                    'Uniforms_DaysSinceLast', 'Uniforms_Pct_of_Total_CY',
-                    'Sparring_Units_CY', 'Sparring_Units_PY', 'Sparring_Units_Lifetime',
-                    'Sparring_Spend_CY', 'Sparring_Spend_PY', 'Sparring_Spend_Lifetime',
-                    'Sparring_Orders_CY', 'Sparring_Orders_Lifetime',
-                    'Sparring_DaysSinceLast', 'Sparring_Pct_of_Total_CY',
-                    'Belts_Units_CY', 'Belts_Units_PY', 'Belts_Units_Lifetime',
-                    'Belts_Spend_CY', 'Belts_Spend_PY', 'Belts_Spend_Lifetime',
-                    'Belts_Orders_CY', 'Belts_Orders_Lifetime',
-                    'Belts_DaysSinceLast', 'Belts_Pct_of_Total_CY',
-                    'Bags_Units_CY', 'Bags_Units_PY', 'Bags_Units_Lifetime',
-                    'Bags_Spend_CY', 'Bags_Spend_PY', 'Bags_Spend_Lifetime',
-                    'Bags_Orders_CY', 'Bags_Orders_Lifetime',
-                    'Bags_DaysSinceLast', 'Bags_Pct_of_Total_CY',
-                    'Customs_Units_CY', 'Customs_Units_PY', 'Customs_Units_Lifetime',
-                    'Customs_Spend_CY', 'Customs_Spend_PY', 'Customs_Spend_Lifetime',
-                    'Customs_Orders_CY', 'Customs_Orders_Lifetime',
-                    'Customs_DaysSinceLast', 'Customs_Pct_of_Total_CY',
-                    'CUBS_Categories_Active_CY', 'CUBS_Categories_Active_PY',
-                    'CUBS_Categories_Ever', 'CUBS_Categories_Trend',
-                ]
-
-                for col in feature_cols:
-                    param_name = f'@{col}'
-                    value = get_attr(row, col)
-
-                    # Check if value is None or NaN
-                    if value is None or (isinstance(value, (float, int)) and pd.isna(value)):
-                        params[param_name] = None
-                        continue
-
-                    # Convert to appropriate type
-                    try:
-                        if 'Pct' in col or 'Trend' in col:
-                            params[param_name] = float(value)  # type: ignore[arg-type]
-                        elif ('Date' in col or 'Days' in col or
-                              col.endswith(('_CY', '_PY', '_Lifetime', '_Ever'))):
-                            if 'Date' in col:
-                                params[param_name] = safe_date_convert(value)
-                            else:
-                                params[param_name] = int(value)  # type: ignore[arg-type]
-                        else:
-                            params[param_name] = float(value)  # type: ignore[arg-type]
-                    except (ValueError, TypeError):
-                        params[param_name] = None
-
-                # Build stored procedure call
-                sp_name = 'dbo.spInsertChurnScores'
-                param_placeholders = ', '.join([f'{k}=?' for k in params])
-
-                sql = f"EXEC {sp_name} {param_placeholders}"
-
-                cursor.execute(sql, list(params.values()))
-                rows_processed += 1
-
-            # Commit after each batch for better error recovery
-            conn.commit()
             logger.debug(
-                "Step '%s': Committed batch %d-%d",
+                "Step '%s': Bulk inserted %d rows into staging table",
                 step,
-                batch_start + 1,
-                batch_end
+                len(data_tuples)
             )
+
+        # Call MERGE stored procedure to merge staging into main table
+        logger.debug("Step '%s': Calling MERGE stored procedure", step)
+        cursor.execute(f"EXEC {MERGE_PROCEDURE}")
+        
+        # Fetch MERGE results (inserted/updated counts)
+        merge_result = cursor.fetchone()
+        if merge_result and len(merge_result) >= 3:
+            inserted_count = merge_result[0]
+            updated_count = merge_result[1]
+            total_count = merge_result[2]
+            logger.info(
+                "Step '%s': MERGE completed - %d inserted, %d updated, %d total",
+                step,
+                inserted_count,
+                updated_count,
+                total_count
+            )
+        else:
+            logger.warning(
+                "Step '%s': MERGE procedure returned unexpected result format: %s",
+                step,
+                merge_result
+            )
+
+        # Truncate staging table (only after successful MERGE)
+        logger.debug("Step '%s': Truncating staging table", step)
+        cursor.execute(f"TRUNCATE TABLE {STAGING_TABLE}")
+
+        # Commit entire transaction
+        conn.commit()
+        logger.debug("Step '%s': Transaction committed", step)
 
         duration = time.time() - start_time
         throughput = rows_processed / duration if duration > 0 else 0
         logger.info(
-            "Step '%s': Successfully wrote %d rows in %.2f seconds (%.2f rows/sec)",
+            "Step '%s': Successfully processed %d rows in %.2f seconds (%.2f rows/sec)",
             step,
             rows_processed,
             duration,
@@ -230,7 +268,7 @@ def insert_churn_scores(df: pd.DataFrame, batch_size: int = 1000) -> int:
         )
         return rows_processed
 
-    except (OSError, ConnectionError, TimeoutError, ValueError) as e:
+    except Exception as e:
         if conn:
             conn.rollback()
             logger.error(

@@ -6,7 +6,7 @@ Comprehensive documentation for automated linting and fixing of Python and Markd
 
 This project uses automated linting with zero-touch fixes via pre-commit hooks and convenient manual commands.
 
-#### Key Features
+### Key Features
 
 - **Automatic fixes** before commits (pre-commit hooks)
 - **Unified commands** for manual fixes
@@ -81,8 +81,6 @@ make lint-check-markdown
 
 ## Individual Commands (Check specific file types)
 
-### Python Linting (Individual Commands)
-
 ```bash
 # Fix all Python files
 python3 scripts/fix-python-lint.py function_app/ scripts/
@@ -98,8 +96,6 @@ python3 scripts/fix-python-lint.py --auto-fix function_app/
 ```
 
 See [`README_PYTHON_SCRIPTS.md`](README_PYTHON_SCRIPTS.md) for detailed Python linting documentation.
-
-## Markdown Linting (Recursive auto-fix)
 
 ```bash
 # Fix all Markdown files
@@ -161,8 +157,6 @@ Pre-commit hooks are configured in [`.pre-commit-config.yaml`](../.pre-commit-co
 
 ## What Gets Fixed
 
-### Python Linting (What Gets Fixed)
-
 **Auto-fixed by ruff** (comprehensive mode):
 
 - Import organization (isort)
@@ -177,8 +171,6 @@ Pre-commit hooks are configured in [`.pre-commit-config.yaml`](../.pre-commit-co
 - **C0303**: trailing-whitespace
 - **C0304**: missing-final-newline
 - **C0321**: multiple-statements
-
-### Markdown Linting (What Gets Fixed)
 
 **Auto-fixed by script**:
 
@@ -263,7 +255,7 @@ When VS Code shows linting errors:
 
 - Just commit - hooks will auto-fix
 
-#### Option 2: Manual fix
+### Option 2: Manual fix
 
 - Copy JSON diagnostics to `errors.json`
 - Run: `python3 scripts/fix-python-lint.py --json errors.json`

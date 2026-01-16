@@ -2,16 +2,15 @@
 Unit tests for scorer.py module.
 """
 
-import pytest
-import pandas as pd
 import numpy as np
-from unittest.mock import patch, MagicMock
+import pandas as pd
+import pytest
+
 from function_app.scorer import (
     normalize_cols,
     convert_excel_dates,
     preprocess,
     risk_band,
-    score_customers,
     feature_phrase,
     reason_text,
     top_reasons,
@@ -106,29 +105,31 @@ def test_risk_band_low():
     assert risk_band(0.15) == "C - Low Risk"
 
 
-def test_score_customers_structure(sample_input_df, monkeypatch):
+def test_score_customers_structure(mocker):
     """Test that score_customers returns expected structure."""
     # Mock model loading to avoid requiring actual model files
-    mock_model = MagicMock()
-    mock_model.predict_proba.return_value = np.array([[0.8, 0.2], [0.5, 0.5], [0.3, 0.7]])
+    mock_model = mocker.MagicMock()
+    mock_model.predict_proba.return_value = np.array([
+        [0.8, 0.2], [0.5, 0.5], [0.3, 0.7]
+    ])
     mock_model.get_booster.return_value.predict.return_value = np.array([
         [0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1],
         [0.05, 0.15, 0.25, 0.15, 0.15, 0.15, 0.1],
         [0.05, 0.1, 0.2, 0.2, 0.2, 0.15, 0.1],
     ])
 
-    with patch("function_app.scorer.load_model") as mock_load:
-        mock_load.return_value = (
-            mock_model,
-            ["Orders_CY", "Spend_CY", "DaysSinceLast", "Segment_FITNESS", "Segment_FARRELL", "CostCenter_CMFIT", "BIAS"]
-        )
-        # This test may fail if model columns don't match - that's OK for now
-        # Full integration test would require proper model files
-        pass  # Placeholder - actual test requires proper model setup
+    mock_load = mocker.patch("function_app.scorer.load_model")
+    feature_cols = [
+        "Orders_CY", "Spend_CY", "DaysSinceLast",
+        "Segment_FITNESS", "Segment_FARRELL", "CostCenter_CMFIT", "BIAS"
+    ]
+    mock_load.return_value = (mock_model, feature_cols)
+    # This test may fail if model columns don't match - that's OK for now
+    # Full integration test would require proper model files
 
 
 @pytest.mark.integration
-def test_score_customers_integration(sample_input_df):
+def test_score_customers_integration():
     """
     Integration test for score_customers (requires model files).
 
@@ -257,7 +258,11 @@ def test_top_reasons_high_risk():
     })
     result = top_reasons(row_contrib, risk=0.8, n=2)
     assert len(result) == 2
-    assert all("risk" in r.lower() or "Low" in r or "High" in r or "Unfavorable" in r for r in result)
+    risk_indicators = ["risk", "low", "high", "unfavorable"]
+    assert all(
+        any(indicator in r.lower() for indicator in risk_indicators)
+        for r in result
+    )
 
 
 def test_top_reasons_low_risk():
