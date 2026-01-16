@@ -2,8 +2,31 @@
 Pytest configuration and shared fixtures.
 """
 
+import os
 import pandas as pd
 import pytest
+
+# Set all required environment variables with dummy test values at module level
+# This ensures they're set before any imports that trigger config instantiation
+# These can be overridden by individual tests using monkeypatch
+_required_test_vars = {
+    "SQL_CONNECTION_STRING": "test_connection_string",
+    "PBI_TENANT_ID": "test_pbi_tenant_id",
+    "PBI_CLIENT_ID": "test_pbi_client_id",
+    "PBI_CLIENT_SECRET": "test_pbi_client_secret",
+    "PBI_WORKSPACE_ID": "test_pbi_workspace_id",
+    "PBI_DATASET_ID": "test_pbi_dataset_id",
+    "EMAIL_TENANT_ID": "test_email_tenant_id",
+    "EMAIL_CLIENT_ID": "test_email_client_id",
+    "EMAIL_CLIENT_SECRET": "test_email_client_secret",
+    "EMAIL_SENDER": "test@example.com",
+    "EMAIL_RECIPIENTS": "test@example.com",
+}
+
+for key, value in _required_test_vars.items():
+    # Only set if not already set (allows tests to override)
+    if key not in os.environ:
+        os.environ[key] = value
 
 
 @pytest.fixture

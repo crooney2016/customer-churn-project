@@ -28,7 +28,7 @@ The codebase is in **good condition** with the new staging table bulk insert imp
 
 ### 2. Unused Import
 
-#### Severity:** ✅ **FIXED
+#### Severity:** ✅ **FIXED (2. Unused Import)
 
 **Issue:** `Optional` imported but not used in `scripts/deploy_sql_schema.py` (line 23)
 
@@ -38,7 +38,7 @@ The codebase is in **good condition** with the new staging table bulk insert imp
 
 ### 3. Overly Complex NaN Check
 
-#### Severity:** ✅ **FIXED
+#### Severity:** ✅ **FIXED (3. Overly Complex NaN Check)
 
 **Issue:** Redundant check in `sql_client.py` line 161
 
@@ -48,7 +48,7 @@ The codebase is in **good condition** with the new staging table bulk insert imp
 
 ### 4. Missing Error Handling for MERGE Results
 
-#### Severity:** ✅ **FIXED
+#### Severity:** ✅ **FIXED (4. Missing Error Handling for MERGE Results)
 
 **Issue:** `sql_client.py` assumes MERGE procedure returns 3 values without validation
 
@@ -202,7 +202,7 @@ def get_sql_connection(connection_string: str, timeout: int = 60) -> pymssql.Con
     # ... existing implementation ...
 ```
 
-#### Files Affected
+## Files Affected
 
 - `function_app/sql_client.py`
 - `scripts/deploy_sql_schema.py`
@@ -277,7 +277,7 @@ def test_connection() -> bool:
 
 ### 15. Hardcoded SQL Table Names
 
-#### Severity:** ✅ **FIXED
+#### Severity:** ✅ **FIXED (15. Hardcoded SQL Table Names)
 
 **Issue:** Table names hardcoded in multiple places
 
@@ -290,7 +290,7 @@ MAIN_TABLE = "dbo.ChurnScoresHistory"
 MERGE_PROCEDURE = "dbo.spMergeChurnScoresFromStaging"
 ```
 
-#### File:** `function_app/sql_client.py:29-32` ✅ **FIXED
+## File:** `function_app/sql_client.py:29-32` ✅ **FIXED
 
 ## Performance
 
@@ -370,7 +370,7 @@ The codebase is in **good shape** with the new staging table implementation. Sev
 - Added constants for SQL table names
 - Added return type hint to get_connection()
 
-#### Remaining Improvements
+### Remaining Improvements
 
 1. **Testing** - Add tests for new functionality (deploy script, staging pattern)
 1. **Schema validation** - Add DataFrame column validation before insert
