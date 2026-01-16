@@ -563,4 +563,4 @@ open htmlcov/index.html
 
 ---
 
-#### Report generated automatically from pytest and coverage tools
+### Report generated automatically from pytest and coverage tools

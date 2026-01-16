@@ -93,8 +93,9 @@ def test_render_template_not_found():
 # =============================================================================
 
 @patch("function_app.email_client.requests.post")
-def test_post_html_success(mock_post, mock_config):
+def test_post_html_success(mock_post, mock_config):  # pylint: disable=unused-argument
     """Test successful HTML POST."""
+    # mock_config fixture sets up config.LOGIC_APP_ENDPOINT
     mock_post.return_value.raise_for_status.return_value = None
 
     _post_html("<html>Test</html>", "Test Subject")
@@ -116,7 +117,7 @@ def test_post_html_no_endpoint(mocker):
 
 
 @patch("function_app.email_client.requests.post")
-def test_post_html_error_logged_not_raised(mock_post, mock_config):
+def test_post_html_error_logged_not_raised(mock_post, mock_config):  # pylint: disable=unused-argument
     """Test that POST errors are logged but not raised."""
     import requests
     mock_post.side_effect = requests.exceptions.ConnectionError("Failed")
@@ -130,7 +131,7 @@ def test_post_html_error_logged_not_raised(mock_post, mock_config):
 # =============================================================================
 
 @patch("function_app.email_client._post_html")
-def test_send_success_email(mock_post, mock_config):
+def test_send_success_email(mock_post, mock_config):  # pylint: disable=unused-argument
     """Test send_success_email generates HTML and posts."""
     send_success_email(
         row_count=100,
@@ -146,7 +147,7 @@ def test_send_success_email(mock_post, mock_config):
 
 
 @patch("function_app.email_client._post_html")
-def test_send_failure_email(mock_post, mock_config):
+def test_send_failure_email(mock_post, mock_config):  # pylint: disable=unused-argument
     """Test send_failure_email generates HTML and posts."""
     send_failure_email(
         error_type="ValueError",

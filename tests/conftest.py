@@ -143,7 +143,10 @@ def sample_scored_df():
 
 
 # Check if SQL connection is available for integration tests
-SQL_CONNECTION_AVAILABLE = os.getenv('SQL_CONNECTION_STRING') is not None and os.getenv('SQL_CONNECTION_STRING') != "Server=test;Database=test;UID=test;PWD=test;"
+SQL_CONNECTION_AVAILABLE = (
+    os.getenv('SQL_CONNECTION_STRING') is not None and
+    os.getenv('SQL_CONNECTION_STRING') != "Server=test;Database=test;UID=test;PWD=test;"
+)
 
 
 @pytest.fixture(scope="session")
@@ -161,22 +164,15 @@ def db_schema_setup():
         pytest.skip("SQL_CONNECTION_STRING not available - skipping schema setup")
 
     try:
-        import sys
-        from pathlib import Path
-
-        # Add scripts to path
-        scripts_path = Path(__file__).parent.parent / "scripts"
-        sys.path.insert(0, str(scripts_path))
-
         from scripts.deploy_sql_schema import main as deploy_schema
         deploy_schema()
         yield True
-    except Exception as e:
+    except (ImportError, RuntimeError, ConnectionError) as e:
         pytest.skip(f"Failed to set up database schema: {str(e)}")
 
 
 @pytest.fixture
-def db_connection(db_schema_setup):
+def db_connection(db_schema_setup):  # pylint: disable=unused-argument
     """
     Get real database connection for integration tests.
 
@@ -187,14 +183,6 @@ def db_connection(db_schema_setup):
     """
     if not SQL_CONNECTION_AVAILABLE:
         pytest.skip("SQL_CONNECTION_STRING not available - skipping integration test")
-
-    import pymssql
-    import sys
-    from pathlib import Path
-
-    # Add scripts to path
-    scripts_path = Path(__file__).parent.parent / "scripts"
-    sys.path.insert(0, str(scripts_path))
 
     from scripts.deploy_sql_schema import get_connection
 
@@ -225,83 +213,9 @@ def db_cleanup(db_connection):
             try:
                 cursor.execute(f"TRUNCATE TABLE dbo.{table};")
                 db_connection.commit()
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 # Table might not exist or already empty - ignore
-                db_connection.rollback()
-
-    yield cleanup
-
-    # Final cleanup
-    cleanup()
-
-
-@pytest.fixture(scope="session")
-def db_schema_setup():
-    """
-    Set up database schema for integration tests.
-
-    Runs deploy_sql_schema.py to create tables, procedures, and functions.
-    Only runs if SQL_CONNECTION_STRING is available.
-
-    Yields:
-        bool: True if schema was set up, False if skipped
-    """
-    if not SQL_CONNECTION_AVAILABLE:
-        pytest.skip("SQL_CONNECTION_STRING not available - skipping schema setup")
-
-    try:
-        from scripts.deploy_sql_schema import main as deploy_schema
-        deploy_schema()
-        yield True
-    except Exception as e:
-        pytest.skip(f"Failed to set up database schema: {str(e)}")
-
-
-@pytest.fixture
-def db_connection(db_schema_setup):
-    """
-    Get real database connection for integration tests.
-
-    Skips test if SQL_CONNECTION_STRING is not available.
-
-    Yields:
-        pymssql.Connection: Database connection
-    """
-    if not SQL_CONNECTION_AVAILABLE:
-        pytest.skip("SQL_CONNECTION_STRING not available - skipping integration test")
-
-    import pymssql
-    from scripts.deploy_sql_schema import get_connection
-
-    conn = get_connection()
-
-    try:
-        yield conn
-    finally:
-        conn.close()
-
-
-@pytest.fixture
-def db_cleanup(db_connection):
-    """
-    Clean up database tables after integration tests.
-
-    Truncates staging table and optionally clears main table.
-    """
-    cursor = db_connection.cursor()
-
-    # Cleanup function
-    def cleanup(tables=None):
-        """Truncate specified tables."""
-        if tables is None:
-            tables = ['ChurnScoresStaging']
-
-        for table in tables:
-            try:
-                cursor.execute(f"TRUNCATE TABLE dbo.{table};")
-                db_connection.commit()
-            except Exception:
-                # Table might not exist or already empty - ignore
+                # Intentionally catching all exceptions for cleanup resilience
                 db_connection.rollback()
 
     yield cleanup

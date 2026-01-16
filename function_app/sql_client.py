@@ -226,6 +226,7 @@ def insert_churn_scores(df: pd.DataFrame, batch_size: int = 5000) -> int:
             )
 
         # Call MERGE stored procedure to merge staging into main table
+        # The procedure handles MERGE, truncate, and transaction internally
         logger.debug("Step '%s': Calling MERGE stored procedure", step)
         cursor.execute(f"EXEC {MERGE_PROCEDURE}")
         
@@ -249,11 +250,8 @@ def insert_churn_scores(df: pd.DataFrame, batch_size: int = 5000) -> int:
                 merge_result
             )
 
-        # Truncate staging table (only after successful MERGE)
-        logger.debug("Step '%s': Truncating staging table", step)
-        cursor.execute(f"TRUNCATE TABLE {STAGING_TABLE}")
-
-        # Commit entire transaction
+        # Commit entire transaction (stored procedure already committed its transaction,
+        # but we commit here to finalize the bulk inserts)
         conn.commit()
         logger.debug("Step '%s': Transaction committed", step)
 

@@ -440,6 +440,10 @@ BEGIN
         -- Calculate inserted count (total - updated)
         SET @InsertedCount = @StagingCount - @UpdatedCount;
         
+        -- Truncate staging table ONLY after successful MERGE
+        -- This ensures staging data is only deleted if merge succeeds
+        TRUNCATE TABLE dbo.ChurnScoresStaging;
+        
         COMMIT TRANSACTION;
         
         -- Return row counts

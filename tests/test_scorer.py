@@ -116,11 +116,11 @@ def test_score_customers_structure(mocker):
         [0.8, 0.2], [0.5, 0.5], [0.3, 0.7]
     ])
     mock_booster = mocker.MagicMock()
-    # Predict should return contributions with BIAS column (7 features + BIAS = 8 columns)
+    # Predict should return contributions with BIAS column (6 features + BIAS = 7 columns)
     mock_booster.predict.return_value = np.array([
-        [0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1, 0.0],  # Added BIAS
-        [0.05, 0.15, 0.25, 0.15, 0.15, 0.15, 0.1, 0.0],  # Added BIAS
-        [0.05, 0.1, 0.2, 0.2, 0.2, 0.15, 0.1, 0.0],  # Added BIAS
+        [0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.0],  # 6 features + BIAS
+        [0.05, 0.15, 0.25, 0.15, 0.15, 0.1, 0.0],  # 6 features + BIAS
+        [0.05, 0.1, 0.2, 0.2, 0.2, 0.15, 0.0],  # 6 features + BIAS
     ])
     mock_model.get_booster.return_value = mock_booster
 
@@ -128,12 +128,7 @@ def test_score_customers_structure(mocker):
     mock_dmatrix = mocker.patch("function_app.scorer.xgb.DMatrix")
     mock_dmatrix_instance = mocker.MagicMock()
     mock_dmatrix.return_value = mock_dmatrix_instance
-    
-    # Mock xgb.DMatrix to avoid requiring xgboost
-    mock_dmatrix = mocker.patch("function_app.scorer.xgb.DMatrix")
-    mock_dmatrix_instance = mocker.MagicMock()
-    mock_dmatrix.return_value = mock_dmatrix_instance
-    
+
     mock_load = mocker.patch("function_app.scorer.load_model")
     feature_cols = [
         "Orders_CY", "Spend_CY", "DaysSinceLast",
@@ -167,58 +162,55 @@ def test_score_customers_structure(mocker):
     assert len(result) == 3
 
 
-def test_load_model_missing_model_file(mocker):
+def test_load_model_missing_model_file(mocker):  # pylint: disable=unused-argument
     """Test load_model raises FileNotFoundError when model file is missing."""
-    from unittest.mock import patch, MagicMock
-    
-    # Mock Path.exists() to return False for model file
-    mock_path = MagicMock()
-    mock_path.exists.return_value = False
-    mock_path.__truediv__ = lambda self, other: self  # Allow / operator
-    mock_path.__str__ = lambda self: "model/churn_model.pkl"
-    
-    with patch("function_app.scorer.Path", return_value=mock_path):
+    from unittest.mock import patch
+
+    # Mock Path.exists at the instance level
+    call_count = [0]
+
+    def mock_path_exists(self):
+        call_count[0] += 1
+        path_str = str(self)
+        # First check is for model file
+        if call_count[0] == 1 and "churn_model.pkl" in path_str:
+            return False  # Model file missing
+        # Other paths return True (to avoid other issues)
+        return True
+
+    with patch("pathlib.Path.exists", mock_path_exists):
         with pytest.raises(FileNotFoundError, match="Model file not found"):
             load_model()
 
-def test_load_model_missing_model_columns_file(mocker):
+def test_load_model_missing_model_columns_file(mocker):  # pylint: disable=unused-argument
     """Test load_model raises FileNotFoundError when model_columns file is missing."""
-    from unittest.mock import patch, MagicMock
-    
-    # Create a mock that returns True for model file, False for columns file
-    mock_path_instance = MagicMock()
-    
-    def mock_exists():
-        # Check the path being tested
-        path_str = str(mock_path_instance)
-        if "churn_model.pkl" in path_str and "model_columns" not in path_str:
+    from unittest.mock import patch, mock_open
+
+    # Track which file is being checked
+    call_count = [0]
+
+    def mock_path_exists(self):
+        call_count[0] += 1
+        path_str = str(self)
+        # First check is for model file (should exist)
+        if call_count[0] == 1 and "churn_model.pkl" in path_str:
             return True  # Model file exists
-        if "model_columns.pkl" in path_str:
+        # Second check is for columns file (should not exist)
+        if call_count[0] == 2 and "model_columns.pkl" in path_str:
             return False  # Columns file missing
-        return False
-    
-    mock_path_instance.exists = mock_exists
-    mock_path_instance.__truediv__ = lambda self, other: self  # Allow / operator
-    mock_path_instance.__str__ = lambda self: "model/churn_model_columns.pkl"
-    
-    # Mock Path class to return our mock instance
-    def path_mock(*args, **kwargs):
-        return mock_path_instance
-    
-    with patch("function_app.scorer.Path", path_mock):
-        # First call should pass (model exists), second should fail (columns missing)
-        call_count = [0]
-        
-        def side_effect():
-            call_count[0] += 1
-            if call_count[0] == 1:
-                return True  # Model file exists
-            return False  # Columns file missing
-        
-        mock_path_instance.exists = side_effect
-        
-        with pytest.raises(FileNotFoundError, match="Model columns file not found"):
-            load_model()
+        # Other paths
+        return True
+
+    with patch("pathlib.Path.exists", mock_path_exists):
+        # Mock file opening since model file "exists" but we don't want to actually read it
+        with patch("builtins.open", mock_open(read_data=b"")):
+            with patch("pickle.load", side_effect=EOFError("Ran out of input")):
+                # Should raise FileNotFoundError for missing columns file, not EOFError
+                try:
+                    load_model()
+                    assert False, "Should have raised FileNotFoundError"
+                except FileNotFoundError as e:
+                    assert "Model columns file not found" in str(e)
 
 
 @pytest.mark.integration

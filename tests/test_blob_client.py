@@ -325,7 +325,9 @@ class TestRenameBlob:
 
         rename_blob("container", "old_name.csv", "new_name.csv")
 
-        mock_move.assert_called_once_with("container", "old_name.csv", "container", "new_name.csv", True)
+        mock_move.assert_called_once_with(
+            "container", "old_name.csv", "container", "new_name.csv", True
+        )
 
 
 class TestListBlobs:
@@ -389,9 +391,13 @@ class TestListBlobs:
         result = list_blobs("container", name_starts_with="file")
 
         assert result == ["file1.csv"]
-        mock_container.list_blobs.assert_called_once_with(name_starts_with="file")
+        mock_container.list_blobs.assert_called_once_with(
+            name_starts_with="file"
+        )
 
-    def test_list_blobs_with_both_prefix_and_name_starts_with(self, _mock_config, mock_blob_service_client, mocker):
+    def test_list_blobs_with_both_prefix_and_name_starts_with(
+        self, _mock_config, mock_blob_service_client, mocker
+    ):
         """Test blob listing with both prefix and name_starts_with filters."""
         _, mock_container, _ = mock_blob_service_client
 
@@ -416,7 +422,9 @@ class TestListBlobs:
 class TestListBlobsWithProperties:
     """Tests for list_blobs_with_properties function."""
 
-    def test_list_blobs_with_properties_success(self, _mock_config, mock_blob_service_client, mocker):
+    def test_list_blobs_with_properties_success(
+        self, _mock_config, mock_blob_service_client, mocker
+    ):
         """Test successful blob listing with properties."""
         _, mock_container, _ = mock_blob_service_client
 
@@ -444,7 +452,9 @@ class TestListBlobsWithProperties:
         assert result[0]["size"] == 1024
         assert result[0]["content_type"] == "text/csv"
 
-    def test_list_blobs_with_properties_no_content_type(self, _mock_config, mock_blob_service_client, mocker):
+    def test_list_blobs_with_properties_no_content_type(
+        self, _mock_config, mock_blob_service_client, mocker
+    ):
         """Test list_blobs_with_properties handles missing content_type."""
         _, mock_container, _ = mock_blob_service_client
 
