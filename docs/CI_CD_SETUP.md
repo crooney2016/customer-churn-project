@@ -46,17 +46,17 @@ See [Git Remotes Setup Guide](./GIT_REMOTES_SETUP.md) for configuring dual remot
 #### Jobs
 
 1. **Test Job:**
-   - Runs pytest with coverage
-   - Uploads coverage to Codecov (optional)
-   - Python 3.11
+- Runs pytest with coverage
+- Uploads coverage to Codecov (optional)
+- Python 3.11
 
 1. **Lint Job:**
-   - Runs pylint, pyright, ruff check, ruff format
-   - Python 3.11
+- Runs pylint, pyright, ruff check, ruff format
+- Python 3.11
 
 1. **Type Check Job:**
-   - Runs pyright for type checking
-   - Python 3.11
+- Runs pyright for type checking
+- Python 3.11
 
 #### Triggers (Option 1: GitHub Actions (`.github/workflows/`))
 
@@ -66,9 +66,9 @@ See [Git Remotes Setup Guide](./GIT_REMOTES_SETUP.md) for configuring dual remot
 #### Jobs (Option 1: GitHub Actions (`.github/workflows/`))
 
 1. **Build and Deploy:**
-   - Runs tests (continues on failure for safety)
-   - Deploys to Azure Function App
-   - Supports staging and production environments
+- Runs tests (continues on failure for safety)
+- Deploys to Azure Function App
+- Supports staging and production environments
 
 ### Option 2: Azure DevOps Pipelines (`azure-pipelines.yml`)
 
@@ -82,14 +82,14 @@ See [Git Remotes Setup Guide](./GIT_REMOTES_SETUP.md) for configuring dual remot
 #### Stages
 
 1. **Test Stage:**
-   - **Test Job:** Runs pytest with coverage, publishes coverage results
-   - **Lint Job:** Runs pylint, pyright, ruff check, ruff format
-   - **Type Check Job:** Runs pyright
+- **Test Job:** Runs pytest with coverage, publishes coverage results
+- **Lint Job:** Runs pylint, pyright, ruff check, ruff format
+- **Type Check Job:** Runs pyright
 
 1. **Deploy Stage:**
-   - **Deploy Job:** Deploys to Azure Function App (main branch only)
-   - Uses Azure Service Connection
-   - Supports environment-specific deployments
+- **Deploy Job:** Deploys to Azure Function App (main branch only)
+- Uses Azure Service Connection
+- Supports environment-specific deployments
 
 #### Key Features
 
@@ -115,16 +115,16 @@ Navigate to: **Settings → Secrets and variables → Actions → New repository
 #### Required Secrets
 
 1. **`AZURE_FUNCTIONAPP_NAME`**
-   - Value: Your Azure Function App name
-   - Example: `century-churn-function-app`
+- Value: Your Azure Function App name
+- Example: `century-churn-function-app`
 
 1. **`AZURE_CREDENTIALS`** (Service Principal JSON)
-   - Value: JSON credentials for Azure login
-   - See "Create Service Principal" section below
+- Value: JSON credentials for Azure login
+- See "Create Service Principal" section below
 
 1. **`AZURE_FUNCTIONAPP_PUBLISH_PROFILE`** (Alternative to Service Principal)
-   - Value: Publish Profile XML from Azure Portal
-   - See "Get Publish Profile" section below
+- Value: Publish Profile XML from Azure Portal
+- See "Get Publish Profile" section below
 
 ### Step 2: Create Azure Service Principal (Option 1)
 
@@ -174,14 +174,14 @@ az ad sp create-for-rbac --name "github-actions-century-churn" \
 ### Step 4: Verify Repository Settings
 
 1. **Enable GitHub Actions:**
-   - Repository → Settings → Actions → General
-   - Ensure "Allow all actions and reusable workflows" is selected
+- Repository → Settings → Actions → General
+- Ensure "Allow all actions and reusable workflows" is selected
 
 1. **Branch Protection (Recommended):**
-   - Repository → Settings → Branches → Add rule
-   - Branch name pattern: `main`
-   - Require status checks: Enable CI pipeline checks
-   - Require branches to be up to date: Enable
+- Repository → Settings → Branches → Add rule
+- Branch name pattern: `main`
+- Require status checks: Enable CI pipeline checks
+- Require branches to be up to date: Enable
 
 ### Step 5: Configure Environments (Optional)
 
@@ -301,7 +301,7 @@ on:
 ### Debug Pipeline
 
 1. **View Logs:**
-   - Actions → Select workflow run → View logs
+- Actions → Select workflow run → View logs
 
 1. **Run Locally:**
 
@@ -313,36 +313,36 @@ on:
    ```
 
 1. **Validate Secrets:**
-   - Repository → Settings → Secrets
-   - Verify all required secrets are set
+- Repository → Settings → Secrets
+- Verify all required secrets are set
 
 ## Security Best Practices
 
 1. **Use Service Principal:**
-   - More secure than Publish Profile
-   - Can be scoped to specific resources
-   - Can be rotated easily
+- More secure than Publish Profile
+- Can be scoped to specific resources
+- Can be rotated easily
 
 1. **Limit Permissions:**
-   - Service Principal should only have `contributor` role on Function App
-   - Avoid using subscription-level permissions
+- Service Principal should only have `contributor` role on Function App
+- Avoid using subscription-level permissions
 
 1. **Rotate Secrets:**
-   - Rotate Service Principal credentials periodically
-   - Update GitHub secrets when rotated
+- Rotate Service Principal credentials periodically
+- Update GitHub secrets when rotated
 
 1. **Branch Protection:**
-   - Require PR reviews
-   - Require CI checks to pass
-   - Prevent force pushes to main
+- Require PR reviews
+- Require CI checks to pass
+- Prevent force pushes to main
 
 ## Monitoring
 
 ### View Pipeline Status
 
 1. **GitHub Actions Tab:**
-   - Repository → Actions
-   - View workflow runs and status
+- Repository → Actions
+- View workflow runs and status
 
 1. **Badge (Optional):**
 
@@ -408,45 +408,45 @@ Edit `.github/workflows/deploy.yml`:
 1. **Azure DevOps → Pipelines → New Pipeline**
 
 1. **Select Repository:**
-   - Choose Azure Repos Git
-   - Select your repository
+- Choose Azure Repos Git
+- Select your repository
 
 1. **Configure Pipeline:**
-   - Choose "Existing Azure Pipelines YAML file"
-   - Path: `azure-pipelines.yml`
-   - Click "Continue"
+- Choose "Existing Azure Pipelines YAML file"
+- Path: `azure-pipelines.yml`
+- Click "Continue"
 
 1. **Review and Run:**
-   - Review pipeline configuration
-   - Click "Run" to test
+- Review pipeline configuration
+- Click "Run" to test
 
 ### Step 2: Configure Service Connection
 
 1. **Azure DevOps → Project Settings → Service connections → New service connection**
 
 1. **Select Azure Resource Manager:**
-   - Service connection type: Azure Resource Manager
-   - Authentication method: Service principal (automatic)
+- Service connection type: Azure Resource Manager
+- Authentication method: Service principal (automatic)
 
 1. **Configure:**
-   - Scope level: Subscription
-   - Subscription: Select your subscription
-   - Resource group: Select your resource group (optional)
-   - Service connection name: `Azure Function App Connection` (or similar)
-   - Grant access permission to all pipelines: ✅
+- Scope level: Subscription
+- Subscription: Select your subscription
+- Resource group: Select your resource group (optional)
+- Service connection name: `Azure Function App Connection` (or similar)
+- Grant access permission to all pipelines: ✅
 
 1. **Verify:**
-   - Test connection
-   - Save
+- Test connection
+- Save
 
 ### Step 3: Configure Pipeline Variables
 
 1. **Azure DevOps → Pipelines → Your Pipeline → Edit → Variables**
 
 1. **Add Variables:**
-   - `AZURE_SERVICE_CONNECTION`: Name of your service connection (e.g., `Azure Function App Connection`)
-   - `AZURE_FUNCTIONAPP_NAME`: Your Function App name (e.g., `century-churn-function-app`)
-   - `pythonVersion`: `3.11` (optional, defaults in YAML)
+- `AZURE_SERVICE_CONNECTION`: Name of your service connection (e.g., `Azure Function App Connection`)
+- `AZURE_FUNCTIONAPP_NAME`: Your Function App name (e.g., `century-churn-function-app`)
+- `pythonVersion`: `3.11` (optional, defaults in YAML)
 
 1. **Save Variables**
 
@@ -455,22 +455,22 @@ Edit `.github/workflows/deploy.yml`:
 1. **Azure DevOps → Pipelines → Environments → Create environment**
 
 1. **Create Production Environment:**
-   - Name: `production`
-   - Add approval gates if needed
+- Name: `production`
+- Add approval gates if needed
 
 1. **Update Pipeline:**
-   - Environment name in `azure-pipelines.yml` should match
+- Environment name in `azure-pipelines.yml` should match
 
 ### Step 5: Verify Pipeline
 
 1. **Run Pipeline Manually:**
-   - Pipelines → Run pipeline
-   - Select branch: `main`
-   - Run
+- Pipelines → Run pipeline
+- Select branch: `main`
+- Run
 
 1. **Monitor Execution:**
-   - View logs in real-time
-   - Verify all stages complete successfully
+- View logs in real-time
+- Verify all stages complete successfully
 
 ## Dual Remote Configuration
 

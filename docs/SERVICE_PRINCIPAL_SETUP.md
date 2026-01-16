@@ -14,40 +14,40 @@ Complete step-by-step guide to set up a service principal for Power BI executeQu
 1. Click **"+ New registration"**
 1. In the dialog, select: **"Register an application to integrate with Microsoft Entra ID (App you're developing)"**
 1. Fill in:
-   - **Name**: `Power BI Service Principal` (or your preferred name)
-   - **Supported account types**: "Accounts in this organizational directory only"
-   - Click **Register**
+- **Name**: `Power BI Service Principal` (or your preferred name)
+- **Supported account types**: "Accounts in this organizational directory only"
+- Click **Register**
 
 1. **Save these values** (you'll need them for `.env`):
-   - **Application (client) ID** - This is your `PBI_CLIENT_ID`
-   - **Directory (tenant) ID** - This is your `PBI_TENANT_ID`
+- **Application (client) ID** - This is your `PBI_CLIENT_ID`
+- **Directory (tenant) ID** - This is your `PBI_TENANT_ID`
 
 ## Step 2: Create Client Secret
 
 1. In your app registration, go to **Certificates & secrets**
 1. Click **"+ New client secret"**
 1. Fill in:
-   - **Description**: `Power BI executeQueries secret`
-   - **Expires**: Choose appropriate expiration (e.g., 24 months)
+- **Description**: `Power BI executeQueries secret`
+- **Expires**: Choose appropriate expiration (e.g., 24 months)
 1. Click **Add**
 1. **IMMEDIATELY copy the secret value** - This is your `PBI_CLIENT_SECRET`
-   - ⚠️ You won't be able to see it again!
+- ⚠️ You won't be able to see it again!
 
 ## Step 3: Create Security Group
 
 1. Go to **Azure Portal** → **Microsoft Entra ID** → **Groups**
 1. Click **"+ New group"**
 1. Fill in:
-   - **Group type**: **Security**
-   - **Group name**: `Power BI Service Principle` (or your preferred name)
-   - Click **Create**
+- **Group type**: **Security**
+- **Group name**: `Power BI Service Principle` (or your preferred name)
+- Click **Create**
 
 1. Add the service principal to the group:
-   - Open the group you just created
-   - Click **Members** → **+ Add members**
-   - Search for your app registration name (`Power BI Service Principal`)
-   - Select it and click **Select**
-   - ⚠️ Important: You're adding the **Enterprise Application** (service principal), not the app registration
+- Open the group you just created
+- Click **Members** → **+ Add members**
+- Search for your app registration name (`Power BI Service Principal`)
+- Select it and click **Select**
+- ⚠️ Important: You're adding the **Enterprise Application** (service principal), not the app registration
 
 ## Step 4: Configure Power BI Tenant Settings
 
@@ -77,8 +77,8 @@ Complete step-by-step guide to set up a service principal for Power BI executeQu
 1. Click **"..."** menu next to the dataset → **Manage permissions**
 1. Click **"Grant people access"**
 1. Add your service principal:
-   - Enter the service principal's **Object ID** (NOT Client ID)
-   - Find Object ID: Azure Portal → App registrations → Your app → Overview → Object ID
+- Enter the service principal's **Object ID** (NOT Client ID)
+- Find Object ID: Azure Portal → App registrations → Your app → Overview → Object ID
 1. Grant permissions: **Read** + **Build** (or **ReadExplore**)
 1. Click **Grant access**
 

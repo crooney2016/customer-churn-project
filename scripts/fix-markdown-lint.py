@@ -19,6 +19,7 @@ Adding New Rules:
 
 Fixes:
 - MD001: Heading increment (must increment by exactly 1 level)
+- MD007: Unordered list indentation (normalizes to 0 for top-level, 2 spaces per level)
 - MD009: Trailing spaces
 - MD012: Multiple blank lines
 - MD024: Duplicate headings
@@ -56,6 +57,63 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Tuple
+
+
+def fix_md007_ul_indent(content: str) -> str:
+    """Fix MD007: Normalize unordered list indentation."""
+    lines = content.split('\n')
+    result = []
+    in_code_fence = False
+    # Track list nesting stack: each element is (indent_spaces, nesting_level)
+    list_stack = []
+
+    for i, line in enumerate(lines):
+        # Track code blocks and code fences (skip processing inside them)
+        if line.strip().startswith('```'):
+            in_code_fence = not in_code_fence
+            result.append(line)
+            continue
+
+        if in_code_fence:
+            result.append(line)
+            continue
+
+        # Check if this is an unordered list item
+        match = re.match(r'^(\s*)([-*+])\s+(.*)$', line)
+        if match:
+            indent_spaces = len(match.group(1))
+            bullet = match.group(2)
+            content_text = match.group(3)
+
+            # Determine nesting level by examining the list stack
+            # Remove items from stack that are at same or greater indentation (end of nested lists)
+            while list_stack and list_stack[-1][0] >= indent_spaces:
+                list_stack.pop()
+
+            # Calculate nesting level
+            if not list_stack:
+                # Top-level list item
+                nesting_level = 0
+            else:
+                # Nested list item - nesting level is parent level + 1
+                nesting_level = list_stack[-1][1] + 1
+
+            # Add to stack
+            list_stack.append((indent_spaces, nesting_level))
+
+            # Normalize indentation: top-level = 0 spaces, nested level N = N * 2 spaces
+            normalized_indent = ' ' * (nesting_level * 2)
+            fixed_line = f"{normalized_indent}{bullet} {content_text}"
+            result.append(fixed_line)
+        else:
+            # Not a list item - clear stack if we've moved away from lists
+            # (but allow blank lines between list items)
+            if line.strip() and not re.match(r'^\s*$', line):
+                # Non-blank, non-list content - clear the stack
+                list_stack = []
+            result.append(line)
+
+    return '\n'.join(result)
 
 
 def fix_md032_blanks_around_lists(content: str) -> str:
@@ -152,33 +210,45 @@ def fix_md029_ordered_list_prefix(content: str) -> str:
         match = re.match(r'^(\s*)(\d+)\.\s+(.*)$', line)
         if match:
             indent = match.group(1)
-            # rest = match.group(3)  # Not currently used, kept for potential future use
 
-            # Find all consecutive list items at same indent level
-            list_items = []
+            # Find all list items at same indent level, allowing blank lines between items
+            # Process the list: collect items and blank lines, preserving structure
+            list_section = []  # Store (line_index, is_list_item, content)
             j = i
+            consecutive_blank_count = 0
 
             while j < len(lines):
-                item_match = re.match(r'^(\s*)(\d+)\.\s+(.*)$', lines[j])
+                current_line = lines[j]
+                
+                # Check if this is a list item at the same indent level
+                item_match = re.match(r'^(\s*)(\d+)\.\s+(.*)$', current_line)
                 if item_match and item_match.group(1) == indent:
-                    list_items.append((j, int(item_match.group(2)), item_match.group(3)))
+                    # Reset blank line counter when we find a list item
+                    consecutive_blank_count = 0
+                    list_section.append((j, True, item_match.group(3)))
                     j += 1
+                elif not current_line.strip():
+                    # Allow single blank lines between list items
+                    if consecutive_blank_count == 0:
+                        list_section.append((j, False, ''))
+                        j += 1
+                        consecutive_blank_count = 1
+                    else:
+                        # Multiple blank lines means end of list
+                        break
                 else:
+                    # Non-list, non-blank content means end of list
                     break
 
-            # Check if we need to fix numbering
-            # If first item is not 1, or items are not sequential starting from where they should
-            if list_items and list_items[0][1] != 1:
-                # Fix: start from 1
-                for _, _, content in list_items:
+            # Fix all list items to use "1." for 1/1/1 style, preserving blank lines
+            for line_idx, is_list_item, content in list_section:
+                if is_list_item:
                     result.append(f"{indent}1. {content}")
+                else:
+                    # Preserve blank line
+                    result.append('')
 
-                i = j
-            else:
-                # Keep as is if numbering is correct
-                for _, _, content in list_items:
-                    result.append(f"{indent}1. {content}")
-                i = j
+            i = j
         else:
             result.append(line)
             i += 1
@@ -561,6 +631,7 @@ def fix_all(content: str) -> str:
     content = fix_md001_heading_increment(content)  # Fix heading increments before duplicates
     content = fix_md024_duplicate_headings(content)  # Fix duplicate headings after increments
     content = fix_md032_blanks_around_lists(content)
+    content = fix_md007_ul_indent(content)  # Fix unordered list indentation after MD032
     content = fix_md031_blanks_around_fences(content)
     content = fix_md036_emphasis_as_heading(content)
     content = fix_md038_spaces_in_code(content)  # Fix code spans before table fixes
@@ -575,6 +646,36 @@ def fix_all(content: str) -> str:
 
 
 # Specific error fixers for JSON diagnostics mode
+def fix_md007_specific(_file_path: Path, line_num: int, content: str) -> str:
+    """Fix MD007: Fix unordered list indentation at specific line."""
+    lines = content.split('\n')
+    idx = line_num - 1
+
+    if idx < 0 or idx >= len(lines):
+        return content
+
+    line = lines[idx]
+    match = re.match(r'^(\s*)([-*+])\s+(.*)$', line)
+    if match:
+        indent_spaces = len(match.group(1))
+        bullet = match.group(2)
+        content_text = match.group(3)
+
+        # Determine correct nesting level by examining previous lines
+        # MD007 error message typically says "Expected: X; Actual: Y"
+        # For now, we'll normalize based on indentation: calculate nesting level
+        nesting_level = 0
+        if indent_spaces > 0:
+            # Calculate nesting: each level should be 2 spaces
+            nesting_level = indent_spaces // 2
+
+        # Normalize to 2 spaces per level (top-level = 0)
+        normalized_indent = ' ' * (nesting_level * 2)
+        lines[idx] = f"{normalized_indent}{bullet} {content_text}"
+
+    return '\n'.join(lines)
+
+
 def fix_md032_specific(_file_path: Path, line_num: int, content: str) -> str:
     """Fix MD032: Add blank line before/after list."""
     lines = content.split('\n')
@@ -629,7 +730,7 @@ def fix_md029_specific(_file_path: Path, line_num: int, content: str) -> str:
     match = re.match(r'^(\s*)(\d+)\.\s+(.*)$', line)
     if match:
         indent = match.group(1)
-        _rest = match.group(3)  # Content after number, not currently used
+        content = match.group(3)  # Content after number
 
         # Find all list items at same indent level
         list_start = idx
@@ -646,8 +747,8 @@ def fix_md029_specific(_file_path: Path, line_num: int, content: str) -> str:
             if re.match(r'^' + re.escape(indent) + r'\d+\.\s+', lines[i]):
                 item_number += 1
 
-        # Replace with correct number
-        lines[idx] = f"{indent}1. {rest}"
+        # Replace with correct number (always use 1 for 1/1/1 style)
+        lines[idx] = f"{indent}1. {content}"
 
     return '\n'.join(lines)
 
@@ -897,6 +998,7 @@ def fix_md056_specific(_file_path: Path, _line_num: int, content: str) -> str:
 # Mapping of error codes to specific fix functions
 SPECIFIC_FIX_FUNCTIONS = {
     'MD001': fix_md001_specific,
+    'MD007': fix_md007_specific,
     'MD009': fix_md009_specific,
     'MD012': fix_md012_specific,
     'MD024': fix_md024_specific,

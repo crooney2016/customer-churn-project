@@ -23,20 +23,20 @@ This document assesses the feasibility and value of implementing a Streamlit das
 ### Existing Tools
 
 1. **Power BI:**
-   - Primary visualization and reporting tool
-   - Business user-friendly interface
-   - Integrated with Azure SQL Database
-   - Provides trend analysis and aggregations
+- Primary visualization and reporting tool
+- Business user-friendly interface
+- Integrated with Azure SQL Database
+- Provides trend analysis and aggregations
 
 1. **Application Insights:**
-   - Technical monitoring and logging
-   - Query-based dashboards available
-   - Developer-oriented interface
+- Technical monitoring and logging
+- Query-based dashboards available
+- Developer-oriented interface
 
 1. **Email Notifications:**
-   - Success/failure notifications
-   - Risk distribution summaries
-   - Pipeline execution metrics
+- Success/failure notifications
+- Risk distribution summaries
+- Pipeline execution metrics
 
 ## Potential Use Cases
 
@@ -107,46 +107,46 @@ This document assesses the feasibility and value of implementing a Streamlit das
 ### Pros
 
 1. **Easy to Build:**
-   - Streamlit is simple and fast to prototype
-   - Python-based (matches existing codebase)
-   - Good integration with pandas DataFrames
+- Streamlit is simple and fast to prototype
+- Python-based (matches existing codebase)
+- Good integration with pandas DataFrames
 
 1. **Good for Non-Technical Users:**
-   - Intuitive interface
-   - No SQL knowledge required
-   - Interactive widgets (filters, sliders, dropdowns)
+- Intuitive interface
+- No SQL knowledge required
+- Interactive widgets (filters, sliders, dropdowns)
 
 1. **Flexible:**
-   - Can combine multiple data sources
-   - Easy to add new visualizations
-   - Can embed external content (charts, iframes)
+- Can combine multiple data sources
+- Easy to add new visualizations
+- Can embed external content (charts, iframes)
 
 1. **Independent:**
-   - Separate from Power BI (different use case)
-   - Doesn't affect core Azure Function code
-   - Can be deployed independently
+- Separate from Power BI (different use case)
+- Doesn't affect core Azure Function code
+- Can be deployed independently
 
 ### Cons
 
 1. **Adds Dependency:**
-   - New dependency (Streamlit)
-   - Requires separate deployment/container
-   - Additional maintenance overhead
+- New dependency (Streamlit)
+- Requires separate deployment/container
+- Additional maintenance overhead
 
 1. **May Duplicate Functionality:**
-   - Power BI already provides visualization
-   - Application Insights provides monitoring
-   - Email notifications provide alerts
+- Power BI already provides visualization
+- Application Insights provides monitoring
+- Email notifications provide alerts
 
 1. **Not Necessary for Core Functionality:**
-   - Core pipeline works without it
-   - Documentation can be in markdown/docs
-   - Monitoring exists in Application Insights
+- Core pipeline works without it
+- Documentation can be in markdown/docs
+- Monitoring exists in Application Insights
 
 1. **Deployment Complexity:**
-   - Requires container or Azure App Service
-   - Needs database/API access
-   - Additional authentication considerations
+- Requires container or Azure App Service
+- Needs database/API access
+- Additional authentication considerations
 
 ## Architecture Options
 
@@ -318,36 +318,36 @@ Use Application Insights Workbooks for monitoring:
 ### Immediate Actions
 
 1. **Document Current State:**
-   - Document what Power BI provides
-   - Document what Application Insights provides
-   - Identify gaps
+- Document what Power BI provides
+- Document what Application Insights provides
+- Identify gaps
 
 1. **Stakeholder Feedback:**
-   - Survey business users on Power BI limitations
-   - Survey ML team on model documentation needs
-   - Survey operations team on monitoring needs
+- Survey business users on Power BI limitations
+- Survey ML team on model documentation needs
+- Survey operations team on monitoring needs
 
 1. **Decision:**
-   - If gaps identified: Consider Phase 1 (Model Documentation)
-   - If Power BI sufficient: Defer Streamlit implementation
-   - If monitoring needs: Consider Application Insights Workbooks first
+- If gaps identified: Consider Phase 1 (Model Documentation)
+- If Power BI sufficient: Defer Streamlit implementation
+- If monitoring needs: Consider Application Insights Workbooks first
 
 ### If Proceeding with Streamlit
 
 1. **Start with Phase 1 (Model Documentation):**
-   - Highest value, lowest risk
-   - Useful for ML team
-   - Can be deployed independently
+- Highest value, lowest risk
+- Useful for ML team
+- Can be deployed independently
 
 1. **Evaluate Before Phase 2:**
-   - Get user feedback on Phase 1
-   - Assess if Phase 2 adds value beyond Power BI
-   - Consider alternatives
+- Get user feedback on Phase 1
+- Assess if Phase 2 adds value beyond Power BI
+- Consider alternatives
 
 1. **Defer Phase 3:**
-   - Application Insights provides monitoring
-   - Cost monitoring can be done in Azure Portal
-   - Only proceed if clear value identified
+- Application Insights provides monitoring
+- Cost monitoring can be done in Azure Portal
+- Only proceed if clear value identified
 
 ## Implementation Example (Phase 1)
 

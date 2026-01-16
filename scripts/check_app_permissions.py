@@ -45,22 +45,22 @@ def get_app_permissions(token: str, app_id: str) -> dict:
         Dictionary with app permissions
     """
     # Get app registration details
-    url = f"https://graph.microsoft.com/v1.0/applications"
+    url = "https://graph.microsoft.com/v1.0/applications"
     headers = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json"
     }
-    
+
     # Filter by appId
     params = {"$filter": f"appId eq '{app_id}'"}
-    
+
     response = requests.get(url, headers=headers, params=params, timeout=60)
-    
+
     if response.status_code == 200:
         apps = response.json().get("value", [])
         if apps:
             return apps[0]
-    
+
     return {}
 
 
@@ -77,33 +77,30 @@ def check_permissions(app_data: dict) -> None:
     print()
     print(f"App ID: {config.PBI_CLIENT_ID}")
     print()
-    
+
     # Get required resource access (API permissions)
     required_resource_access = app_data.get("requiredResourceAccess", [])
-    
+
     if not required_resource_access:
         print("✓ No API permissions configured")
         print("\nThis is correct - apps using service principal for admin APIs")
         print("should NOT have admin-consent required permissions for Power BI.")
         return
-    
+
     print("Found API permissions:")
     print("-" * 60)
-    
+
     power_bi_permissions = []
     for resource in required_resource_access:
         resource_id = resource.get("resourceAppId", "")
-        resource_name = "Unknown"
-        
+
         # Check if this is Power BI Service
         if resource_id == "00000009-0000-0000-c000-000000000000":  # Power BI Service
-            resource_name = "Power BI Service"
-            
             app_permissions = resource.get("resourceAccess", [])
             for perm in app_permissions:
                 perm_id = perm.get("id", "")
                 perm_type = perm.get("type", "")
-                
+
                 if perm_type == "Role":  # Application permission (admin consent required)
                     power_bi_permissions.append({
                         "id": perm_id,
@@ -135,10 +132,10 @@ def main() -> None:
         token = get_access_token()
         print("✓ Token acquired")
         print()
-        
+
         print("Fetching app registration details...")
         app_data = get_app_permissions(token, config.PBI_CLIENT_ID)
-        
+
         if not app_data:
             print("✗ Could not retrieve app registration")
             print("\nManual check required:")
@@ -148,10 +145,10 @@ def main() -> None:
             print("4. Check if there are any Application permissions for Power BI Service")
             print("5. If yes, REMOVE them (keep only Delegated if needed)")
             sys.exit(1)
-        
+
         check_permissions(app_data)
         print()
-        
+
     except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"\n✗ Error: {type(e).__name__}")
         print(f"  Reason: {str(e)}")

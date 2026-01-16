@@ -3,7 +3,7 @@
 # Run manually: pre-commit run --all-files
 
 repos:
-  # Auto-fix markdown linting errors
+  # Auto-fix linting errors
   - repo: local
     hooks:
       - id: fix-markdown-lint
@@ -13,6 +13,16 @@ repos:
         files: \.md$
         pass_filenames: false
         args: ['.']
+        # Auto-stage fixed files
+        stages: [commit]
+
+      - id: fix-python-lint
+        name: Fix Python linting errors
+        entry: python3 scripts/fix-python-lint.py
+        language: system
+        files: \.py$
+        pass_filenames: false
+        args: ['function_app/', 'scripts/']
         # Auto-stage fixed files
         stages: [commit]
 

@@ -2,15 +2,35 @@
 
 Automated scripts for fixing common markdownlint errors following `.cursor/rules/markdown.md` guidelines.
 
+#### For comprehensive linting automation (Python + Markdown), see [`README_LINTING.md`](README_LINTING.md)
+
 ## Quick Start
 
-### Fix all markdown files in project (Quick Start)
+### Unified Command (Recommended)
+
+For fixing both Python and Markdown linting errors:
+
+```bash
+# Fix all linting errors (Python + Markdown)
+./scripts/fix-all-lint.sh
+
+# Or using Make
+make lint-fix
+
+# Preview changes (dry-run)
+./scripts/fix-all-lint.sh --dry-run
+make lint-check
+```
+
+See [`README_LINTING.md`](README_LINTING.md) for comprehensive linting automation documentation.
+
+## Fix all markdown files in project
 
 ```bash
 ./scripts/fix-all-markdown.sh
 ```
 
-#### Fix specific directory (Fix all markdown files in project)
+### Fix specific directory (Fix all markdown files in project)
 
 ```bash
 python3 scripts/fix-markdown-lint.py docs/
@@ -39,6 +59,7 @@ python3 scripts/fix-markdown-lint.py --dry-run docs/
 #### Fixes
 
 - **MD001** - Heading increment (fixes heading level jumps)
+- **MD007** - Unordered list indentation (normalizes to 0 for top-level, 2 spaces per level)
 - **MD009** - Trailing spaces (removes trailing spaces)
 - **MD012** - Multiple blank lines (normalizes to single blank line)
 - **MD024** - Duplicate headings (adds context to make unique)
@@ -53,8 +74,6 @@ python3 scripts/fix-markdown-lint.py --dry-run docs/
 - **MD047** - Trailing newline (ensures exactly one)
 - **MD056** - Table column count (fixes mismatched table columns)
 - **MD060** - Table spacing (adds spaces around pipes)
-- **MD001** - Heading increment (fixes heading level jumps)
-- **MD024** - Duplicate headings (adds context to make unique)
 
 ```bash
 # Comprehensive mode (default) - fix all errors
@@ -143,6 +162,17 @@ Run via: **Terminal → Run Task → Fix Markdown Lint**
 
 ## Common Errors and Fixes
 
+### MD007: Unordered list indentation
+
+**Error:** Unordered list indentation [Expected: 0; Actual: 1] (or similar)
+
+**Fix:** Script normalizes unordered list indentation:
+
+- Top-level lists start at column 0 (no indentation)
+- Nested lists use 2 spaces per nesting level (level 1 = 2 spaces, level 2 = 4 spaces, etc.)
+- Preserves bullet style (`-`, `*`, or `+`)
+- Handles nested lists correctly by tracking list context
+
 ### MD032: Blank lines around lists
 
 **Error:** Lists should be surrounded by blank lines
@@ -197,11 +227,11 @@ When a new markdownlint error is encountered:
 
 1. **Fix it manually** first to understand the pattern
 1. **Add to script** following the pattern in `fix-markdown-lint.py`:
-   - Create `fix_mdXXX_error_name()` comprehensive function
-   - Create `fix_mdXXX_specific()` for JSON mode
-   - Add to `fix_all()` pipeline (check order dependencies)
-   - Add to `SPECIFIC_FIX_FUNCTIONS` dictionary
-   - Update docstring with new error code
+- Create `fix_mdXXX_error_name()` comprehensive function
+- Create `fix_mdXXX_specific()` for JSON mode
+- Add to `fix_all()` pipeline (check order dependencies)
+- Add to `SPECIFIC_FIX_FUNCTIONS` dictionary
+- Update docstring with new error code
 1. **Test** with known error cases
 1. **Document** in `.cursor/rules/markdown.md` and `.cursor/rules/linting.md`
 1. **Update this README** with the new error code
@@ -214,7 +244,7 @@ The scripts handle **most common** markdownlint errors automatically, but some i
 
 - **MD013** - Line length (requires manual formatting decisions based on content)
 
-**Note:** All other common errors (MD001, MD009, MD012, MD024, MD026, MD029, MD031, MD032, MD034, MD036, MD038, MD040, MD047, MD056, MD060) are now handled automatically by the script.
+**Note:** All other common errors (MD001, MD007, MD009, MD012, MD024, MD026, MD029, MD031, MD032, MD034, MD036, MD038, MD040, MD047, MD056, MD060) are now handled automatically by the script.
 
 ## Automation
 
@@ -255,9 +285,9 @@ A Git hook script is available at `.git/hooks/pre-commit`. To enable:
    ```
 
 1. The hook will automatically:
-   - Run the fix script on all markdown files
-   - Re-stage any fixed files
-   - Allow the commit to proceed
+- Run the fix script on all markdown files
+- Re-stage any fixed files
+- Allow the commit to proceed
 
 1. To disable temporarily:
 
@@ -350,5 +380,6 @@ Add to `.vscode/settings.json`:
 
 ## References
 
+- [`README_LINTING.md`](README_LINTING.md) - Comprehensive linting automation guide
 - `.cursor/rules/markdown.md` - Markdown formatting rules and guidelines
 - [markdownlint Documentation](https://github.com/DavidAnson/markdownlint)

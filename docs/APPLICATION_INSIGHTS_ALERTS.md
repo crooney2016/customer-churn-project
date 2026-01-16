@@ -23,8 +23,8 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts → Create alert rule
 1. **Scope:** Select Application Insights resource and resource type "Any"
 1. **Condition:**
-   - **Signal type:** Custom log search
-   - **Search query:**
+- **Signal type:** Custom log search
+- **Search query:**
 
      ```kusto
      traces
@@ -33,17 +33,17 @@ This document provides instructions for setting up Application Insights alerts f
      | where timestamp > ago(5m)
      ```
 
-   - **Alert logic:**
-     - Number of results: Greater than 0
-     - Evaluation frequency: Every 1 minute
-     - Lookback period: 5 minutes
+- **Alert logic:**
+  - Number of results: Greater than 0
+  - Evaluation frequency: Every 1 minute
+  - Lookback period: 5 minutes
 1. **Actions:**
-   - Action group: Create or select action group with email notifications
-   - Email recipients: Operations team
+- Action group: Create or select action group with email notifications
+- Email recipients: Operations team
 1. **Alert details:**
-   - Alert rule name: `Churn Pipeline - Execution Failure`
-   - Severity: Critical
-   - Description: Alert when churn scoring pipeline fails at any step
+- Alert rule name: `Churn Pipeline - Execution Failure`
+- Severity: Critical
+- Description: Alert when churn scoring pipeline fails at any step
 
 - Triggers immediately when pipeline fails
 - Sends email notification with error details
@@ -56,8 +56,8 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts → Create alert rule
 1. **Scope:** Select Application Insights resource and resource type "Any"
 1. **Condition:**
-   - **Signal type:** Custom log search
-   - **Search query:**
+- **Signal type:** Custom log search
+- **Search query:**
 
      ```kusto
      traces
@@ -69,17 +69,17 @@ This document provides instructions for setting up Application Insights alerts f
      | project error_rate
      ```
 
-   - **Alert logic:**
-     - Number of results: Greater than 0
-     - Evaluation frequency: Every 5 minutes
-     - Lookback period: 1 hour
-     - Threshold value: 5 (error rate > 5%)
+- **Alert logic:**
+  - Number of results: Greater than 0
+  - Evaluation frequency: Every 5 minutes
+  - Lookback period: 1 hour
+  - Threshold value: 5 (error rate > 5%)
 1. **Actions:**
-   - Action group: Same as Alert 1
+- Action group: Same as Alert 1
 1. **Alert details:**
-   - Alert rule name: `Churn Pipeline - High Error Rate`
-   - Severity: Warning
-   - Description: Alert when error rate exceeds 5% over 1 hour
+- Alert rule name: `Churn Pipeline - High Error Rate`
+- Severity: Warning
+- Description: Alert when error rate exceeds 5% over 1 hour
 
 - Triggers when error rate > 5% in past hour
 - Helps detect gradual degradation
@@ -92,8 +92,8 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts → Create alert rule
 1. **Scope:** Select Application Insights resource and resource type "Any"
 1. **Condition:**
-   - **Signal type:** Custom log search
-   - **Search query:**
+- **Signal type:** Custom log search
+- **Search query:**
 
      ```kusto
      traces
@@ -105,16 +105,16 @@ This document provides instructions for setting up Application Insights alerts f
      | where max_duration > 600  // 10 minutes
      ```
 
-   - **Alert logic:**
-     - Number of results: Greater than 0
-     - Evaluation frequency: Every 15 minutes
-     - Lookback period: 1 hour
+- **Alert logic:**
+  - Number of results: Greater than 0
+  - Evaluation frequency: Every 15 minutes
+  - Lookback period: 1 hour
 1. **Actions:**
-   - Action group: Same as Alert 1
+- Action group: Same as Alert 1
 1. **Alert details:**
-   - Alert rule name: `Churn Pipeline - Performance Degradation`
-   - Severity: Warning
-   - Description: Alert when pipeline execution time exceeds 10 minutes
+- Alert rule name: `Churn Pipeline - Performance Degradation`
+- Severity: Warning
+- Description: Alert when pipeline execution time exceeds 10 minutes
 
 - Triggers when execution time > 10 minutes
 - Indicates potential performance issues
@@ -127,8 +127,8 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts → Create alert rule
 1. **Scope:** Select Application Insights resource and resource type "Any"
 1. **Condition:**
-   - **Signal type:** Custom log search
-   - **Search query:**
+- **Signal type:** Custom log search
+- **Search query:**
 
      ```kusto
      traces
@@ -139,16 +139,16 @@ This document provides instructions for setting up Application Insights alerts f
      | where rows_scored < 5000  // Adjust threshold based on expected minimum
      ```
 
-   - **Alert logic:**
-     - Number of results: Greater than 0
-     - Evaluation frequency: Every 15 minutes
-     - Lookback period: 1 hour
+- **Alert logic:**
+  - Number of results: Greater than 0
+  - Evaluation frequency: Every 15 minutes
+  - Lookback period: 1 hour
 1. **Actions:**
-   - Action group: Same as Alert 1
+- Action group: Same as Alert 1
 1. **Alert details:**
-   - Alert rule name: `Churn Pipeline - Low Row Count`
-   - Severity: Warning
-   - Description: Alert when pipeline processes fewer than expected rows
+- Alert rule name: `Churn Pipeline - Low Row Count`
+- Severity: Warning
+- Description: Alert when pipeline processes fewer than expected rows
 
 - Triggers when row count < expected threshold
 - Indicates potential data source issues
@@ -161,8 +161,8 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts → Create alert rule
 1. **Scope:** Select Application Insights resource and resource type "Any"
 1. **Condition:**
-   - **Signal type:** Custom log search
-   - **Search query:**
+- **Signal type:** Custom log search
+- **Search query:**
 
      ```kusto
      traces
@@ -170,16 +170,16 @@ This document provides instructions for setting up Application Insights alerts f
      | where timestamp > ago(5m)
      ```
 
-   - **Alert logic:**
-     - Number of results: Greater than 0
-     - Evaluation frequency: Every 1 minute
-     - Lookback period: 5 minutes
+- **Alert logic:**
+  - Number of results: Greater than 0
+  - Evaluation frequency: Every 1 minute
+  - Lookback period: 5 minutes
 1. **Actions:**
-   - Action group: Same as Alert 1
+- Action group: Same as Alert 1
 1. **Alert details:**
-   - Alert rule name: `Churn Pipeline - No DAX Results`
-   - Severity: Critical
-   - Description: Alert when DAX query returns no rows
+- Alert rule name: `Churn Pipeline - No DAX Results`
+- Severity: Critical
+- Description: Alert when DAX query returns no rows
 
 - Triggers immediately when DAX query fails
 - Critical alert for data pipeline
@@ -192,8 +192,8 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts → Create alert rule
 1. **Scope:** Select Application Insights resource and resource type "Any"
 1. **Condition:**
-   - **Signal type:** Custom log search
-   - **Search query:**
+- **Signal type:** Custom log search
+- **Search query:**
 
      ```kusto
      traces
@@ -203,17 +203,17 @@ This document provides instructions for setting up Application Insights alerts f
      | where execution_count == 0
      ```
 
-   - **Alert logic:**
-     - Number of results: Greater than 0
-     - Evaluation frequency: Every 6 hours
-     - Lookback period: 2 days
-   - **Note:** This alert is designed to catch missing monthly executions. Adjust timing based on schedule.
+- **Alert logic:**
+  - Number of results: Greater than 0
+  - Evaluation frequency: Every 6 hours
+  - Lookback period: 2 days
+- **Note:** This alert is designed to catch missing monthly executions. Adjust timing based on schedule.
 1. **Actions:**
-   - Action group: Same as Alert 1
+- Action group: Same as Alert 1
 1. **Alert details:**
-   - Alert rule name: `Churn Pipeline - Timer Not Executing`
-   - Severity: Critical
-   - Description: Alert when monthly timer trigger doesn't execute
+- Alert rule name: `Churn Pipeline - Timer Not Executing`
+- Severity: Critical
+- Description: Alert when monthly timer trigger doesn't execute
 
 - Triggers if no pipeline execution in 2 days (after expected run date)
 - Critical for monthly batch jobs
@@ -225,18 +225,18 @@ This document provides instructions for setting up Application Insights alerts f
 
 1. Azure Portal → Application Insights → Alerts → Action groups → Create
 1. **Basics:**
-   - Name: `churn-pipeline-alerts`
-   - Display name: `Churn Pipeline Alerts`
-   - Subscription: Select subscription
-   - Resource group: Select resource group
+- Name: `churn-pipeline-alerts`
+- Display name: `Churn Pipeline Alerts`
+- Subscription: Select subscription
+- Resource group: Select resource group
 1. **Notifications:**
-   - Notification type: Email/SMS/Push/Voice
-   - Name: `operations-team`
-   - Email: Add operations team email addresses
-   - SMS: Add phone numbers (optional)
+- Notification type: Email/SMS/Push/Voice
+- Name: `operations-team`
+- Email: Add operations team email addresses
+- SMS: Add phone numbers (optional)
 1. **Actions:**
-   - Action type: Email/SMS (already added in notifications)
-   - Configure recipients
+- Action type: Email/SMS (already added in notifications)
+- Configure recipients
 1. **Tags:** (Optional) Add tags for resource organization
 1. **Review + Create:** Review and create action group
 
@@ -251,30 +251,30 @@ This document provides instructions for setting up Application Insights alerts f
 ### Test Alert 1: Function Execution Failures
 
 1. **Trigger test failure:**
-   - Manually trigger pipeline with invalid configuration
-   - Or temporarily break code to cause failure
+- Manually trigger pipeline with invalid configuration
+- Or temporarily break code to cause failure
 1. **Verify alert:**
-   - Check Application Insights → Alerts → Alert history
-   - Verify alert fired within 1-2 minutes
-   - Verify email notification received
+- Check Application Insights → Alerts → Alert history
+- Verify alert fired within 1-2 minutes
+- Verify email notification received
 
 ### Test Alert 2: High Error Rate
 
 1. **Simulate errors:**
-   - Trigger multiple pipeline runs that fail
-   - Ensure error rate > 5% over 1 hour
+- Trigger multiple pipeline runs that fail
+- Ensure error rate > 5% over 1 hour
 1. **Verify alert:**
-   - Check alert history
-   - Verify email notification
+- Check alert history
+- Verify email notification
 
 ### Test Alert 3: Performance Degradation
 
 1. **Simulate slow execution:**
-   - Add artificial delay to pipeline code (temporary)
-   - Trigger pipeline execution
+- Add artificial delay to pipeline code (temporary)
+- Trigger pipeline execution
 1. **Verify alert:**
-   - Check alert history
-   - Verify email notification
+- Check alert history
+- Verify email notification
 
 ## Alert Management
 
@@ -288,10 +288,10 @@ This document provides instructions for setting up Application Insights alerts f
 
 1. Azure Portal → Application Insights → Alerts → Alert history
 1. Filter by:
-   - Time range
-   - Alert rule name
-   - Severity
-   - Status (fired/resolved)
+- Time range
+- Alert rule name
+- Severity
+- Status (fired/resolved)
 
 ### Disabling/Enabling Alerts
 
@@ -304,10 +304,10 @@ This document provides instructions for setting up Application Insights alerts f
 1. Azure Portal → Application Insights → Alerts
 1. Select alert rule
 1. Click "Edit" to modify:
-   - Query
-   - Thresholds
-   - Evaluation frequency
-   - Action groups
+- Query
+- Thresholds
+- Evaluation frequency
+- Action groups
 
 ## Dashboard Queries
 
@@ -378,25 +378,25 @@ requests
 ## Best Practices
 
 1. **Start with Critical Alerts:**
-   - Set up Alert 1 (Execution Failures) first
-   - Add other alerts incrementally
+- Set up Alert 1 (Execution Failures) first
+- Add other alerts incrementally
 
 1. **Tune Thresholds:**
-   - Adjust thresholds based on actual performance
-   - Monitor alert frequency and adjust if too noisy
+- Adjust thresholds based on actual performance
+- Monitor alert frequency and adjust if too noisy
 
 1. **Document Alert Logic:**
-   - Document expected behavior in alert descriptions
-   - Include runbook links in alert notifications
+- Document expected behavior in alert descriptions
+- Include runbook links in alert notifications
 
 1. **Review and Refine:**
-   - Review alert history monthly
-   - Remove false positives
-   - Add new alerts as needed
+- Review alert history monthly
+- Remove false positives
+- Add new alerts as needed
 
 1. **Test Regularly:**
-   - Test alerts after deployment changes
-   - Verify notification delivery
+- Test alerts after deployment changes
+- Verify notification delivery
 
 ## Troubleshooting
 

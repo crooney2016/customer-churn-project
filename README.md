@@ -50,8 +50,8 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
    ```
 
 1. **Verify model files exist:**
-   - `model/churn_model.pkl`
-   - `model/model_columns.pkl`
+- `model/churn_model.pkl`
+- `model/model_columns.pkl`
 
 ## Local Development Workflow
 
@@ -120,10 +120,10 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    ```
 
 1. **Verify:**
-   - Table: `dbo.ChurnScoresHistory`
-   - View: `dbo.vwCustomerCurrent`
-   - Function: `dbo.fnCalculateStatus`
-   - Procedure: `dbo.spInsertChurnScores`
+- Table: `dbo.ChurnScoresHistory`
+- View: `dbo.vwCustomerCurrent`
+- Function: `dbo.fnCalculateStatus`
+- Procedure: `dbo.spInsertChurnScores`
 
 ## Azure Function App Deployment
 
@@ -136,8 +136,8 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 ### Deployment Steps
 
 1. **Set environment variables in Function App:**
-   - All variables from `.env.example`
-   - Set via Azure Portal → Configuration → Application settings
+- All variables from `.env.example`
+- Set via Azure Portal → Configuration → Application settings
 
 1. **Deploy Function App:**
 
@@ -157,9 +157,9 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    ```
 
 1. **Monitor:**
-   - Application Insights for logs and traces
-   - Function App → Monitor for execution history
-   - Email notifications for success/failure
+- Application Insights for logs and traces
+- Function App → Monitor for execution history
+- Email notifications for success/failure
 
 ### Function Endpoints
 

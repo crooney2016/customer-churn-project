@@ -13,19 +13,19 @@ This document provides instructions for monitoring and optimizing Azure Consumpt
 ### Cost Components
 
 1. **Execution Time:**
-   - Billed per GB-second
-   - Based on memory allocation and execution duration
-   - Formula: `(Memory in GB) × (Execution Time in Seconds) × (Price per GB-second)`
+- Billed per GB-second
+- Based on memory allocation and execution duration
+- Formula: `(Memory in GB) × (Execution Time in Seconds) × (Price per GB-second)`
 
 1. **Function Executions:**
-   - First 1 million executions free per month
-   - Additional executions: $0.20 per million
-   - Typically not a concern for monthly jobs
+- First 1 million executions free per month
+- Additional executions: $0.20 per million
+- Typically not a concern for monthly jobs
 
 1. **Application Insights:**
-   - First 5 GB free per month
-   - Additional data: ~$2.30 per GB
-   - Can be significant with verbose logging
+- First 5 GB free per month
+- Additional data: ~$2.30 per GB
+- Can be significant with verbose logging
 
 ## Monitoring Costs
 
@@ -34,14 +34,14 @@ This document provides instructions for monitoring and optimizing Azure Consumpt
 1. **Azure Portal → Cost Management + Billing → Cost analysis**
 
 1. **Filter by Resource:**
-   - Resource type: Function App
-   - Resource: `<your-function-app-name>`
-   - Time range: Last 30 days / Last 7 days
+- Resource type: Function App
+- Resource: `<your-function-app-name>`
+- Time range: Last 30 days / Last 7 days
 
 1. **View Metrics:**
-   - Total cost
-   - Cost by date
-   - Cost breakdown by resource
+- Total cost
+- Cost by date
+- Cost breakdown by resource
 
 ### Method 2: Application Insights Metrics
 
@@ -210,18 +210,18 @@ requests
 1. **Azure Portal → Cost Management + Billing → Budgets → Create budget**
 
 1. **Budget Configuration:**
-   - Scope: Subscription or Resource Group
-   - Budget amount: Set monthly budget (e.g., $50)
-   - Period: Monthly
-   - Reset type: Monthly
+- Scope: Subscription or Resource Group
+- Budget amount: Set monthly budget (e.g., $50)
+- Period: Monthly
+- Reset type: Monthly
 
 1. **Alert Conditions:**
-   - Alert threshold: 50%, 75%, 90%, 100%
-   - Alert recipients: Operations team email
+- Alert threshold: 50%, 75%, 90%, 100%
+- Alert recipients: Operations team email
 
 1. **Action Groups:**
-   - Create action group with email notifications
-   - Add recipients
+- Create action group with email notifications
+- Add recipients
 
 ### Cost Monitoring Query (Application Insights)
 

@@ -196,22 +196,22 @@ Or use Azure Data Studio / SSMS to execute scripts in order.
 ### Service Principal Setup
 
 1. **Create App Registration:**
-   - Azure Portal → Azure Active Directory → App registrations → New registration
-   - Name: `pbi-churn-scoring-sp`
-   - Save Client ID and Tenant ID
+- Azure Portal → Azure Active Directory → App registrations → New registration
+- Name: `pbi-churn-scoring-sp`
+- Save Client ID and Tenant ID
 
 1. **Create Client Secret:**
-   - Certificates & secrets → New client secret
-   - Save secret value (only shown once)
+- Certificates & secrets → New client secret
+- Save secret value (only shown once)
 
 1. **Grant Permissions:**
-   - API permissions → Add permission → Power BI Service → Delegated permissions
-   - Grant: `Dataset.Read.All`, `Dataset.ReadWrite.All`
-   - Admin consent required
+- API permissions → Add permission → Power BI Service → Delegated permissions
+- Grant: `Dataset.Read.All`, `Dataset.ReadWrite.All`
+- Admin consent required
 
 1. **Add Service Principal to Workspace:**
-   - Power BI Portal → Workspace → Access → Add service principal
-   - Role: Member or Admin
+- Power BI Portal → Workspace → Access → Add service principal
+- Role: Member or Admin
 
 ### Dataset Access
 
@@ -243,15 +243,15 @@ curl -X POST https://<your-function-app>.azurewebsites.net/api/score
 ## Verify Pipeline Execution
 
 1. **Check Application Insights:**
-   - Azure Portal → Application Insights → Logs
-   - Query: `traces | where message contains "Pipeline completed" | order by timestamp desc | take 10`
+- Azure Portal → Application Insights → Logs
+- Query: `traces | where message contains "Pipeline completed" | order by timestamp desc | take 10`
 
 1. **Check Function App Logs:**
-   - Azure Portal → Function App → Functions → Monitor
-   - View recent executions
+- Azure Portal → Function App → Functions → Monitor
+- View recent executions
 
 1. **Check Email Notifications:**
-   - Verify success/failure emails received
+- Verify success/failure emails received
 
 1. **Check SQL Database:**
 
@@ -266,8 +266,8 @@ curl -X POST https://<your-function-app>.azurewebsites.net/api/score
    ```
 
 1. **Check Power BI:**
-   - Power BI Portal → Dataset → Refresh history
-   - Verify refresh was triggered
+- Power BI Portal → Dataset → Refresh history
+- Verify refresh was triggered
 
 ## Step 8: Timer Configuration
 
@@ -381,9 +381,9 @@ az functionapp logs tail --name <function-app-name> --resource-group <resource-g
 ### Debugging Steps
 
 1. **Enable Debug Logging:**
-   - Azure Portal → Function App → Configuration
-   - Set `AZURE_FUNCTIONS_ENVIRONMENT=Development` (temporary)
-   - Restart Function App
+- Azure Portal → Function App → Configuration
+- Set `AZURE_FUNCTIONS_ENVIRONMENT=Development` (temporary)
+- Restart Function App
 
 1. **View Real-Time Logs:**
 
@@ -425,87 +425,87 @@ az functionapp logs tail --name <function-app-name> --resource-group <resource-g
 If deployment causes issues:
 
 1. **Revert to Previous Deployment:**
-   - Azure Portal → Function App → Deployment Center → Deployment history
-   - Select previous successful deployment
-   - Click "Redeploy"
+- Azure Portal → Function App → Deployment Center → Deployment history
+- Select previous successful deployment
+- Click "Redeploy"
 
 1. **Disable Function Temporarily:**
-   - Azure Portal → Function App → Functions
-   - Disable problematic function
+- Azure Portal → Function App → Functions
+- Disable problematic function
 
 1. **Restore Configuration:**
-   - Export current configuration (backup)
-   - Restore previous environment variables
+- Export current configuration (backup)
+- Restore previous environment variables
 
 ## Monitoring
 
 ### Key Metrics to Monitor
 
 1. **Function Execution:**
-   - Execution count
-   - Success/failure rate
-   - Average duration
-   - Error rate by step
+- Execution count
+- Success/failure rate
+- Average duration
+- Error rate by step
 
 1. **Cost Monitoring:**
-   - Azure Consumption plan usage (GB-seconds)
-   - Function execution count
-   - Cost per execution
+- Azure Consumption plan usage (GB-seconds)
+- Function execution count
+- Cost per execution
 
 1. **Data Quality:**
-   - Rows scored per run
-   - Expected vs actual row counts
-   - Risk distribution changes
+- Rows scored per run
+- Expected vs actual row counts
+- Risk distribution changes
 
 ### Application Insights Alerts
 
 Set up alerts for:
 
 1. **Error Rate:**
-   - Alert when error rate > 5% in 1 hour
+- Alert when error rate > 5% in 1 hour
 
 1. **Function Failures:**
-   - Alert on any function failure
+- Alert on any function failure
 
 1. **Performance:**
-   - Alert when duration > 10 minutes
+- Alert when duration > 10 minutes
 
 1. **Data Quality:**
-   - Alert when row count < expected threshold
+- Alert when row count < expected threshold
 
 ## Maintenance
 
 ### Regular Tasks
 
 1. **Monthly:**
-   - Review Application Insights logs
-   - Verify timer trigger execution
-   - Check cost metrics
+- Review Application Insights logs
+- Verify timer trigger execution
+- Check cost metrics
 
 1. **Quarterly:**
-   - Review and rotate secrets
-   - Update dependencies (`requirements.txt`)
-   - Review and update model files
+- Review and rotate secrets
+- Update dependencies (`requirements.txt`)
+- Review and update model files
 
 1. **As Needed:**
-   - Update model files when retraining
-   - Adjust timer schedule if needed
-   - Update email recipients
+- Update model files when retraining
+- Adjust timer schedule if needed
+- Update email recipients
 
 ### Secret Rotation
 
 1. **Generate New Secrets:**
-   - Azure AD → App registrations → Certificates & secrets
-   - Create new client secret
+- Azure AD → App registrations → Certificates & secrets
+- Create new client secret
 
 1. **Update Configuration:**
-   - Azure Portal → Function App → Configuration
-   - Update `PBI_CLIENT_SECRET` or `EMAIL_CLIENT_SECRET`
-   - Save and restart
+- Azure Portal → Function App → Configuration
+- Update `PBI_CLIENT_SECRET` or `EMAIL_CLIENT_SECRET`
+- Save and restart
 
 1. **Verify:**
-   - Trigger manual test run
-   - Verify emails and logs
+- Trigger manual test run
+- Verify emails and logs
 
 ## Support
 
