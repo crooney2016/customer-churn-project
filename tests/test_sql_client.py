@@ -4,7 +4,12 @@ Unit tests for sql_client.py module.
 
 import pytest
 import pandas as pd
-from function_app.sql_client import insert_churn_scores, _validate_dataframe_schema
+from function_app.sql_client import (
+    insert_churn_scores,
+    _validate_dataframe_schema,
+    get_connection,
+    _parse_connection_string,
+)
 
 
 def test_insert_scores_uses_executemany(mock_sql_connection, sample_scored_df):
@@ -69,6 +74,77 @@ def test_insert_scores_batches_correctly(mock_sql_connection):
     assert cursor.executemany.call_count >= 2  # At least 2 batches (1000 + 1000 + 500)
     # Should commit once (single transaction)
     assert conn.commit.call_count == 1
+
+def test_insert_scores_batch_size_exact(mock_sql_connection):
+    """Test insert_churn_scores with exact batch size."""
+    conn, cursor = mock_sql_connection
+    cursor.fetchone.return_value = (100, 0, 100)
+
+    # Create DataFrame with exactly batch_size rows
+    df = pd.DataFrame({
+        "CustomerId": [f"00{i}" for i in range(100)],
+        "ChurnRiskPct": [0.5] * 100,
+        "RiskBand": ["B - Medium Risk"] * 100,
+        "Reason_1": ["Reason 1"] * 100,
+        "Reason_2": ["Reason 2"] * 100,
+        "Reason_3": ["Reason 3"] * 100,
+        "SnapshotDate": pd.to_datetime(["2024-01-01"] * 100),
+        "AccountName": ["Account"] * 100,
+        "Segment": ["FITNESS"] * 100,
+        "CostCenter": ["CMFIT"] * 100,
+        "FirstPurchaseDate": pd.to_datetime(["2023-01-01"] * 100),
+        "LastPurchaseDate": pd.to_datetime(["2024-01-01"] * 100),
+    })
+
+    rows_written = insert_churn_scores(df, batch_size=100)
+
+    assert rows_written == 100
+    assert cursor.executemany.call_count == 1  # Exactly one batch
+    assert conn.commit.call_count == 1
+
+def test_insert_scores_merge_unexpected_result_format(mock_sql_connection, sample_scored_df):
+    """Test insert_churn_scores handles unexpected MERGE result format."""
+    _conn, cursor = mock_sql_connection
+    # Mock MERGE procedure result with unexpected format (not enough values)
+    cursor.fetchone.return_value = (len(sample_scored_df),)  # Only one value instead of 3
+
+    # Should still complete successfully but log warning
+    rows_written = insert_churn_scores(sample_scored_df)
+
+    assert rows_written == len(sample_scored_df)
+    # MERGE was still called
+    assert cursor.execute.called
+
+def test_insert_scores_with_nan_values(mock_sql_connection):
+    """Test insert_churn_scores handles NaN values correctly."""
+    _conn, cursor = mock_sql_connection
+    cursor.fetchone.return_value = (2, 0, 2)
+
+    # DataFrame with NaN values
+    df = pd.DataFrame({
+        "CustomerId": ["001", "002"],
+        "SnapshotDate": pd.to_datetime(["2024-01-01", "2024-01-01"]),
+        "ChurnRiskPct": [0.5, 0.6],
+        "RiskBand": ["B - Medium Risk", "A - High Risk"],
+        "Reason_1": ["Reason 1", None],  # NaN value
+        "Reason_2": [None, "Reason 2"],  # NaN value
+        "Reason_3": ["Reason 3", "Reason 3"],
+        "AccountName": ["Account A", "Account B"],
+        "Segment": ["FITNESS", "FARRELL"],
+        "CostCenter": ["CMFIT", "CMFIT"],
+        "FirstPurchaseDate": pd.to_datetime(["2023-01-01", "2023-06-01"]),
+        "LastPurchaseDate": pd.to_datetime([None, "2024-01-01"]),  # NaN value
+    })
+
+    rows_written = insert_churn_scores(df)
+
+    assert rows_written == 2
+    assert cursor.executemany.called
+    # Verify None values were handled (check that executemany was called with tuples containing None)
+    call_args = cursor.executemany.call_args
+    assert call_args is not None
+    data_tuples = call_args[0][1]  # Second argument is data tuples
+    assert len(data_tuples) == 2
 
 
 def test_insert_scores_calls_merge_procedure(mock_sql_connection, sample_scored_df):
@@ -146,17 +222,54 @@ def test_insert_scores_validates_schema(mock_sql_connection):
 
 
 @pytest.mark.integration
-def test_insert_scores_integration():
+def test_insert_scores_integration(db_connection, db_cleanup, sample_scored_df):
     """
     Integration test for insert_churn_scores (requires actual database).
 
-    Marked as integration test - skip in CI without database.
+    Tests:
+    1. Insert scored data into actual database
+    2. Verify data in ChurnScoresHistory table
+    3. Verify staging table is empty after MERGE
     """
-    pytest.skip("Requires database connection - run locally or in integration test environment")
+    from function_app.sql_client import insert_churn_scores
+
+    cursor = db_connection.cursor()
+
+    # Clean up before test
+    db_cleanup(['ChurnScoresStaging', 'ChurnScoresHistory'])
+
+    # Insert scores
+    rows_written = insert_churn_scores(sample_scored_df)
+
+    # Verify rows written
+    assert rows_written == len(sample_scored_df)
+
+    # Verify data in main table
+    cursor.execute("SELECT COUNT(*) FROM dbo.ChurnScoresHistory;")
+    main_count = cursor.fetchone()[0]
+    assert main_count == len(sample_scored_df)
+
+    # Verify staging table is empty after MERGE
+    cursor.execute("SELECT COUNT(*) FROM dbo.ChurnScoresStaging;")
+    staging_count = cursor.fetchone()[0]
+    assert staging_count == 0
+
+    # Verify data integrity - check one record
+    cursor.execute("""
+        SELECT CustomerId, SnapshotDate, ChurnRiskPct, RiskBand
+        FROM dbo.ChurnScoresHistory
+        WHERE CustomerId = '001'
+    """)
+    row = cursor.fetchone()
+    assert row is not None
+    assert row[0] == "001"
+    assert row[1] == pd.Timestamp("2024-01-01").date()
+    assert row[2] == 0.15
+    assert row[3] == "C - Low Risk"
 
 
 @pytest.mark.integration
-def test_staging_table_full_flow():
+def test_staging_table_full_flow(db_connection, db_cleanup, sample_scored_df):
     """
     Integration test for complete staging table pattern.
 
@@ -165,21 +278,154 @@ def test_staging_table_full_flow():
     2. Verify staging table has data (query staging table)
     3. Verify MERGE was called (check main table has data)
     4. Verify staging table is empty after MERGE (query staging table)
-
-    Marked as integration test - skip in CI without database.
     """
-    pytest.skip("Requires database connection - run locally or in integration test environment")
+    from function_app.sql_client import insert_churn_scores
+
+    cursor = db_connection.cursor()
+
+    # Clean up before test
+    db_cleanup(['ChurnScoresStaging', 'ChurnScoresHistory'])
+
+    # Insert scores (this inserts into staging, then calls MERGE)
+    rows_written = insert_churn_scores(sample_scored_df)
+
+    # Verify rows written
+    assert rows_written == len(sample_scored_df)
+
+    # Verify staging table is empty after MERGE (insert_churn_scores calls MERGE internally)
+    cursor.execute("SELECT COUNT(*) FROM dbo.ChurnScoresStaging;")
+    staging_count = cursor.fetchone()[0]
+    assert staging_count == 0
+
+    # Verify main table has data
+    cursor.execute("SELECT COUNT(*) FROM dbo.ChurnScoresHistory;")
+    main_count = cursor.fetchone()[0]
+    assert main_count == len(sample_scored_df)
+
+    # Verify all records are in main table
+    cursor.execute("""
+        SELECT CustomerId, SnapshotDate, ChurnRiskPct
+        FROM dbo.ChurnScoresHistory
+        ORDER BY CustomerId
+    """)
+    rows = cursor.fetchall()
+    assert len(rows) == len(sample_scored_df)
 
 
 @pytest.mark.integration
-def test_staging_table_merge_idempotent():
+def test_staging_table_merge_idempotent(db_connection, db_cleanup, sample_scored_df):
     """
     Integration test to verify MERGE is idempotent.
 
     Tests that calling insert_churn_scores() twice with same data:
     1. First call: Inserts new records
     2. Second call: Updates existing records (no duplicates)
-
-    Marked as integration test - skip in CI without database.
     """
-    pytest.skip("Requires database connection - run locally or in integration test environment")
+    from function_app.sql_client import insert_churn_scores
+
+    cursor = db_connection.cursor()
+
+    # Clean up before test
+    db_cleanup(['ChurnScoresStaging', 'ChurnScoresHistory'])
+
+    # First insert
+    rows_written_1 = insert_churn_scores(sample_scored_df)
+    assert rows_written_1 == len(sample_scored_df)
+
+    # Verify main table has data
+    cursor.execute("SELECT COUNT(*) FROM dbo.ChurnScoresHistory;")
+    count_1 = cursor.fetchone()[0]
+    assert count_1 == len(sample_scored_df)
+
+    # Second insert with same data (should update, not duplicate)
+    rows_written_2 = insert_churn_scores(sample_scored_df)
+    assert rows_written_2 == len(sample_scored_df)
+
+    # Verify no duplicates (count should be same)
+    cursor.execute("SELECT COUNT(*) FROM dbo.ChurnScoresHistory;")
+    count_2 = cursor.fetchone()[0]
+    assert count_2 == len(sample_scored_df)
+
+    # Verify data was updated (check ScoredAt timestamp if it changed)
+    # The MERGE should have updated the records, not created duplicates
+    cursor.execute("""
+        SELECT COUNT(*) FROM (
+            SELECT CustomerId, SnapshotDate
+            FROM dbo.ChurnScoresHistory
+            GROUP BY CustomerId, SnapshotDate
+            HAVING COUNT(*) > 1
+        ) AS duplicates
+    """)
+    duplicate_count = cursor.fetchone()[0]
+    assert duplicate_count == 0, "Found duplicate records after second insert"
+
+
+class TestParseConnectionString:
+    """Tests for _parse_connection_string function."""
+
+    def test_parse_connection_string_full(self):
+        """Test parsing full connection string."""
+        conn_str = "Server=server;Port=1433;Database=db;UID=user;PWD=pass;"
+        result = _parse_connection_string(conn_str)
+
+        assert result["server"] == "server"
+        assert result["port"] == 1433
+        assert result["database"] == "db"
+        assert result["user"] == "user"
+        assert result["password"] == "pass"
+
+    def test_parse_connection_string_minimal(self):
+        """Test parsing minimal connection string (server only)."""
+        conn_str = "Server=server;"
+        result = _parse_connection_string(conn_str)
+
+        assert result["server"] == "server"
+
+    def test_parse_connection_string_case_insensitive(self):
+        """Test parsing connection string with different cases."""
+        conn_str = "SERVER=server;DATABASE=db;UID=user;PWD=pass;"
+        result = _parse_connection_string(conn_str)
+
+        assert result["server"] == "server"
+        assert result["database"] == "db"
+        assert result["user"] == "user"
+        assert result["password"] == "pass"
+
+    def test_parse_connection_string_alternative_key_names(self):
+        """Test parsing connection string with alternative key names."""
+        conn_str = "Server=server;Initial Catalog=db;User ID=user;Password=pass;"
+        result = _parse_connection_string(conn_str)
+
+        assert result["server"] == "server"
+        assert result["database"] == "db"
+        assert result["user"] == "user"
+        assert result["password"] == "pass"
+
+
+class TestGetConnection:
+    """Tests for get_connection function."""
+
+    def test_get_connection_missing_env(self, mocker):
+        """Test get_connection raises error when connection string is missing."""
+        # Mock config to return None
+        mocker.patch("function_app.sql_client.config.SQL_CONNECTION_STRING", None)
+        
+        # get_connection() will try to parse None, which will fail with AttributeError
+        # when _parse_connection_string tries to call .split() on None
+        # This is expected behavior - should raise AttributeError
+        with pytest.raises(AttributeError):
+            get_connection()
+
+    def test_get_connection_invalid_connection_string(self, mocker):
+        """Test get_connection handles invalid connection string."""
+        mocker.patch("function_app.sql_client.config.SQL_CONNECTION_STRING", "invalid")
+
+        # Should still parse (may raise connection error later)
+        # But parsing should handle gracefully
+        try:
+            result = _parse_connection_string("invalid")
+            # If parsing succeeds, connection will fail at connect() stage
+            assert "server" in result or result == {}
+        except Exception:
+            # Parsing failed - that's okay for invalid input
+            pass

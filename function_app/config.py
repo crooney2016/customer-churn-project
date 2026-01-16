@@ -4,8 +4,8 @@ Loads settings from environment variables using Pydantic Settings.
 """
 
 from pathlib import Path
-from typing import List, Optional
-from pydantic import Field, ValidationError, field_validator
+from typing import Optional
+from pydantic import Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 try:
@@ -22,6 +22,9 @@ except ImportError:
 class Config(BaseSettings):
     """
     Application configuration from environment variables.
+
+    Architecture:
+        Blob trigger → Parse CSV → Score → SQL Upsert → Produce HTML
 
     Uses Pydantic Settings for type-safe configuration with automatic validation.
     """
@@ -40,104 +43,34 @@ class Config(BaseSettings):
         min_length=1,
     )
 
-    # Power BI (DAX queries and dataset refresh)
-    PBI_TENANT_ID: str = Field(
-        ...,
-        description="Power BI tenant ID",
-        min_length=1,
-    )
-    PBI_CLIENT_ID: str = Field(
-        ...,
-        description="Power BI service principal client ID",
-        min_length=1,
-    )
-    PBI_CLIENT_SECRET: str = Field(
-        ...,
-        description="Power BI service principal client secret",
-        min_length=1,
-    )
-    PBI_WORKSPACE_ID: str = Field(
-        ...,
-        description="Power BI workspace ID",
-        min_length=1,
-    )
-    PBI_DATASET_ID: str = Field(
-        ...,
-        description="Power BI dataset ID",
-        min_length=1,
-    )
-    DAX_QUERY_NAME: Optional[str] = Field(
-        default=None,
-        description="Name of DAX query file (without .dax extension)",
-    )
-
     # Azure Blob Storage
     BLOB_STORAGE_CONNECTION_STRING: str = Field(
-        default="",
+        ...,
         description="Azure Blob Storage connection string",
+        min_length=1,
     )
     BLOB_STORAGE_CONTAINER_NAME: str = Field(
         default="churn-feature-data",
         description="Blob container name for feature data",
     )
 
-    # Email (Microsoft Graph API)
-    EMAIL_TENANT_ID: str = Field(
-        ...,
-        description="Email tenant ID (Microsoft Graph API)",
-        min_length=1,
-    )
-    EMAIL_CLIENT_ID: str = Field(
-        ...,
-        description="Email service principal client ID",
-        min_length=1,
-    )
-    EMAIL_CLIENT_SECRET: str = Field(
-        ...,
-        description="Email service principal client secret",
-        min_length=1,
-    )
-    EMAIL_SENDER: str = Field(
-        ...,
-        description="Email sender address",
-        min_length=1,
-    )
-    EMAIL_RECIPIENTS: str = Field(
-        ...,
-        description="Comma-separated list of email recipients",
-        min_length=1,
+    # Optional: Logic App endpoint for sending HTML results
+    # If set, the function will POST HTML content to this endpoint
+    LOGIC_APP_ENDPOINT: Optional[str] = Field(
+        default=None,
+        description="Optional Logic App HTTP endpoint for HTML output",
     )
 
-    @field_validator("EMAIL_RECIPIENTS")
-    @classmethod
-    def validate_email_recipients(cls, v: str) -> str:
-        """Validate email recipients string is not empty after parsing."""
-        recipients = [r.strip() for r in v.split(",") if r.strip()]
-        if not recipients:
-            raise ValueError("EMAIL_RECIPIENTS must contain at least one recipient")
-        return v
-
-    def validate(self) -> None:
+    def validate(self) -> None:  # pylint: disable=arguments-renamed
         """
         Validate that required configuration is present.
 
         Note: Pydantic validates on instantiation, but this method is kept
         for backward compatibility and explicit validation calls.
         """
-        # Pydantic already validates required fields on instantiation
-        # This method ensures all fields are non-empty
         required_fields = [
             "SQL_CONNECTION_STRING",
-            "PBI_TENANT_ID",
-            "PBI_CLIENT_ID",
-            "PBI_CLIENT_SECRET",
-            "PBI_WORKSPACE_ID",
-            "PBI_DATASET_ID",
-            "EMAIL_TENANT_ID",
-            "EMAIL_CLIENT_ID",
-            "EMAIL_CLIENT_SECRET",
-            "EMAIL_SENDER",
-            "EMAIL_RECIPIENTS",
+            "BLOB_STORAGE_CONNECTION_STRING",
         ]
 
         missing = []
@@ -148,10 +81,6 @@ class Config(BaseSettings):
 
         if missing:
             raise ValueError(f"Missing required configuration: {', '.join(missing)}")
-
-    def get_email_recipients(self) -> List[str]:
-        """Parse comma-separated email recipients."""
-        return [r.strip() for r in self.EMAIL_RECIPIENTS.split(",") if r.strip()]
 
 
 # Global config instance

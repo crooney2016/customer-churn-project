@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churn Prediction Pipeline - Success</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="1000" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #28a745; padding: 30px 40px; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                                ✓ Pipeline Execution Successful
+                            </h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                The churn prediction pipeline has completed successfully.
+                            </p>
+                            
+                            <!-- Summary Table -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Snapshot Date
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ snapshot_date }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Rows Scored
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ "{:,}".format(row_count) }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Execution Duration
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ "%.2f"|format(duration_seconds) }} seconds
+                                    </td>
+                                </tr>
+                                {% if avg_risk is defined and avg_risk is not none %}
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Average Churn Risk
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ "%.1f"|format(avg_risk * 100) }}%
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if median_risk is defined and median_risk is not none %}
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Median Churn Risk
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ "%.1f"|format(median_risk * 100) }}%
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+
+                            <!-- Model Metrics -->
+                            {% if (model_auc is defined and model_auc is not none) or (model_version is defined and model_version) %}
+                            <h2 style="margin: 30px 0 15px 0; color: #333333; font-size: 18px; font-weight: bold;">
+                                Model Information
+                            </h2>
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 30px 0; border-collapse: collapse;">
+                                {% if model_auc is defined and model_auc is not none %}
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        ROC AUC Score
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ "%.4f"|format(model_auc) }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                                {% if model_version is defined and model_version %}
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Model Version
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ model_version }}
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            </table>
+                            {% endif %}
+                            
+                            <!-- Risk Distribution -->
+                            {% if risk_distribution %}
+                            <h2 style="margin: 30px 0 15px 0; color: #333333; font-size: 18px; font-weight: bold;">
+                                Risk Distribution
+                            </h2>
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 30px 0; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 12px; background-color: #007bff; color: #ffffff; text-align: left; border: 1px solid #0056b3;">
+                                            Risk Band
+                                        </th>
+                                        <th style="padding: 12px; background-color: #007bff; color: #ffffff; text-align: right; border: 1px solid #0056b3;">
+                                            Count
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for risk_band, count in risk_distribution.items()|sort %}
+                                    <tr>
+                                        <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                            {{ risk_band }}
+                                        </td>
+                                        <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333; text-align: right;">
+                                            {{ "{:,}".format(count) }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% endif %}
+
+                            <!-- Top Reasons -->
+                            {% if top_reasons is defined and top_reasons %}
+                            <h2 style="margin: 30px 0 15px 0; color: #333333; font-size: 18px; font-weight: bold;">
+                                Top Churn Risk Drivers
+                            </h2>
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 30px 0; border-collapse: collapse;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding: 12px; background-color: #dc3545; color: #ffffff; text-align: left; border: 1px solid #c82333;">
+                                            Reason
+                                        </th>
+                                        <th style="padding: 12px; background-color: #dc3545; color: #ffffff; text-align: right; border: 1px solid #c82333;">
+                                            Customers Affected
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for reason, count in top_reasons.items()|sort(attribute='1', reverse=true) %}
+                                    <tr>
+                                        <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                            {{ reason }}
+                                        </td>
+                                        <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333; text-align: right;">
+                                            {{ "{:,}".format(count) }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                            {% endif %}
+
+                            <p style="margin: 30px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                This is an automated notification from the Churn Prediction Pipeline.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px 40px; border-radius: 0 0 8px 8px; border-top: 1px solid #dee2e6;">
+                            <p style="margin: 0; color: #6c757d; font-size: 12px; text-align: center;">
+                                Generated at {{ timestamp }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

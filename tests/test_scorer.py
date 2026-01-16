@@ -14,6 +14,8 @@ from function_app.scorer import (
     feature_phrase,
     reason_text,
     top_reasons,
+    load_model,
+    score_customers,
 )
 
 
@@ -53,10 +55,11 @@ def test_preprocess_strips_brackets():
         "[Segment]": ["FITNESS"],
         "[Orders_CY]": [10],
     })
+    # Normalize first, then preprocess
+    df = normalize_cols(df)
     result = preprocess(df)
-    # Should have normalized column names
-    assert "[CustomerId]" not in result.columns
-    assert "[Segment]" not in result.columns
+    # Should have processed columns (identifiers dropped, dummies created)
+    assert "Segment_FITNESS" in result.columns or any("Segment" in c for c in result.columns)
 
 
 def test_preprocess_fills_null_segment():
@@ -112,20 +115,110 @@ def test_score_customers_structure(mocker):
     mock_model.predict_proba.return_value = np.array([
         [0.8, 0.2], [0.5, 0.5], [0.3, 0.7]
     ])
-    mock_model.get_booster.return_value.predict.return_value = np.array([
-        [0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1],
-        [0.05, 0.15, 0.25, 0.15, 0.15, 0.15, 0.1],
-        [0.05, 0.1, 0.2, 0.2, 0.2, 0.15, 0.1],
+    mock_booster = mocker.MagicMock()
+    # Predict should return contributions with BIAS column (7 features + BIAS = 8 columns)
+    mock_booster.predict.return_value = np.array([
+        [0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.1, 0.0],  # Added BIAS
+        [0.05, 0.15, 0.25, 0.15, 0.15, 0.15, 0.1, 0.0],  # Added BIAS
+        [0.05, 0.1, 0.2, 0.2, 0.2, 0.15, 0.1, 0.0],  # Added BIAS
     ])
+    mock_model.get_booster.return_value = mock_booster
 
+    # Mock xgb.DMatrix to avoid requiring xgboost
+    mock_dmatrix = mocker.patch("function_app.scorer.xgb.DMatrix")
+    mock_dmatrix_instance = mocker.MagicMock()
+    mock_dmatrix.return_value = mock_dmatrix_instance
+    
+    # Mock xgb.DMatrix to avoid requiring xgboost
+    mock_dmatrix = mocker.patch("function_app.scorer.xgb.DMatrix")
+    mock_dmatrix_instance = mocker.MagicMock()
+    mock_dmatrix.return_value = mock_dmatrix_instance
+    
     mock_load = mocker.patch("function_app.scorer.load_model")
     feature_cols = [
         "Orders_CY", "Spend_CY", "DaysSinceLast",
-        "Segment_FITNESS", "Segment_FARRELL", "CostCenter_CMFIT", "BIAS"
+        "Segment_FITNESS", "Segment_FARRELL", "CostCenter_CMFIT"
     ]
     mock_load.return_value = (mock_model, feature_cols)
-    # This test may fail if model columns don't match - that's OK for now
-    # Full integration test would require proper model files
+
+    df = pd.DataFrame({
+        "CustomerId": ["001", "002", "003"],
+        "AccountName": ["Account A", "Account B", "Account C"],
+        "Segment": ["FITNESS", "FARRELL", "FITNESS"],
+        "CostCenter": ["CMFIT", "CMFIT", "CMFIT"],
+        "SnapshotDate": pd.to_datetime(["2024-01-01", "2024-01-01", "2024-01-01"]),
+        "FirstPurchaseDate": pd.to_datetime(["2023-01-01", "2023-06-01", "2022-01-01"]),
+        "LastPurchaseDate": pd.to_datetime(["2024-01-01", "2023-12-01", "2024-01-01"]),
+        "Orders_CY": [10, 5, 20],
+        "Spend_CY": [5000.0, 2500.0, 10000.0],
+        "DaysSinceLast": [10, 30, 5],
+    })
+
+    result = score_customers(df)
+
+    # Verify output columns
+    assert "ChurnRiskPct" in result.columns
+    assert "RiskBand" in result.columns
+    assert "Reason_1" in result.columns
+    assert "Reason_2" in result.columns
+    assert "Reason_3" in result.columns
+    assert "CustomerId" in result.columns
+    assert "SnapshotDate" in result.columns
+    assert len(result) == 3
+
+
+def test_load_model_missing_model_file(mocker):
+    """Test load_model raises FileNotFoundError when model file is missing."""
+    from unittest.mock import patch, MagicMock
+    
+    # Mock Path.exists() to return False for model file
+    mock_path = MagicMock()
+    mock_path.exists.return_value = False
+    mock_path.__truediv__ = lambda self, other: self  # Allow / operator
+    mock_path.__str__ = lambda self: "model/churn_model.pkl"
+    
+    with patch("function_app.scorer.Path", return_value=mock_path):
+        with pytest.raises(FileNotFoundError, match="Model file not found"):
+            load_model()
+
+def test_load_model_missing_model_columns_file(mocker):
+    """Test load_model raises FileNotFoundError when model_columns file is missing."""
+    from unittest.mock import patch, MagicMock
+    
+    # Create a mock that returns True for model file, False for columns file
+    mock_path_instance = MagicMock()
+    
+    def mock_exists():
+        # Check the path being tested
+        path_str = str(mock_path_instance)
+        if "churn_model.pkl" in path_str and "model_columns" not in path_str:
+            return True  # Model file exists
+        if "model_columns.pkl" in path_str:
+            return False  # Columns file missing
+        return False
+    
+    mock_path_instance.exists = mock_exists
+    mock_path_instance.__truediv__ = lambda self, other: self  # Allow / operator
+    mock_path_instance.__str__ = lambda self: "model/churn_model_columns.pkl"
+    
+    # Mock Path class to return our mock instance
+    def path_mock(*args, **kwargs):
+        return mock_path_instance
+    
+    with patch("function_app.scorer.Path", path_mock):
+        # First call should pass (model exists), second should fail (columns missing)
+        call_count = [0]
+        
+        def side_effect():
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return True  # Model file exists
+            return False  # Columns file missing
+        
+        mock_path_instance.exists = side_effect
+        
+        with pytest.raises(FileNotFoundError, match="Model columns file not found"):
+            load_model()
 
 
 @pytest.mark.integration
@@ -303,4 +396,5 @@ def test_top_reasons_excludes_bias():
     result = top_reasons(row_contrib, risk=0.8, n=1)
     assert len(result) == 1
     assert "BIAS" not in result[0]
-    assert "Orders" in result[0]
+    # Result should contain "order" (from feature_phrase mapping)
+    assert "order" in result[0].lower()

@@ -43,14 +43,13 @@ def test_all_core_rules_exist():
 
 def test_all_domain_rules_exist():
     """Test that all domain-specific rules listed in review-rules.md actually exist."""
+    # Note: dax.md and power-bi.md removed - now using Logic Apps for DAX queries
     domain_rules = [
         "function-app.md",
         "sql.md",
-        "dax.md",
         "scoring.md",
         "notebooks.md",
         "deployment.md",
-        "power-bi.md",
     ]
 
     missing = []
@@ -141,8 +140,8 @@ def test_output_reference():
     """Test that output file reference is correct."""
     content = REVIEW_RULES_FILE.read_text(encoding='utf-8')
 
-    # Check if outputs/rules-review.md is mentioned
-    output_ref = "outputs/rules-review.md"
+    # Check if .internal/ directory is mentioned for output
+    output_ref = ".internal/"
     assert output_ref in content, "review-rules.md should specify output location"
 
     print("✓ Output reference is correct")
@@ -167,8 +166,8 @@ def test_all_rule_files_exist():
         "logging.md", "markdown.md", "error-handling.md", "secrets.md"
     }
     expected_domain = {
-        "function-app.md", "sql.md", "dax.md", "scoring.md",
-        "notebooks.md", "deployment.md", "power-bi.md"
+        "function-app.md", "sql.md", "scoring.md",
+        "notebooks.md", "deployment.md"
     }
     expected_all = expected_core | expected_domain
 

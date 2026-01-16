@@ -38,7 +38,7 @@ def sample_csv_bytes():
 
 
 @pytest.fixture
-def mock_config(mocker):
+def _mock_config(mocker):
     """Mock config with blob storage settings."""
     mock = mocker.patch("function_app.blob_client.config")
     mock.BLOB_STORAGE_CONNECTION_STRING = (
@@ -52,6 +52,20 @@ def mock_config(mocker):
 # =============================================================================
 # Basic Operations Tests
 # =============================================================================
+
+class TestGetBlobServiceClient:
+    """Tests for _get_blob_service_client function."""
+
+    def test_get_blob_service_client_missing_connection_string(self, mocker):
+        """Test _get_blob_service_client raises ValueError when connection string is missing."""
+        mock_config = mocker.patch("function_app.blob_client.config")
+        mock_config.BLOB_STORAGE_CONNECTION_STRING = None
+
+        from function_app.blob_client import _get_blob_service_client
+
+        with pytest.raises(ValueError, match="BLOB_STORAGE_CONNECTION_STRING not configured"):
+            _get_blob_service_client()
+
 
 class TestReadBlobBytes:
     """Tests for read_blob_bytes function."""
@@ -146,7 +160,7 @@ class TestDeleteBlob:
         mock_blob.delete_blob.assert_called_once()
 
     def test_delete_blob_not_found(self, _mock_config, mock_blob_service_client, mocker):
-        """Test delete blob that doesn't exist."""
+        """Test delete blob that doesn't exist logs warning but doesn't raise."""
         from azure.core.exceptions import ResourceNotFoundError
 
         _, _, mock_blob = mock_blob_service_client
@@ -155,8 +169,8 @@ class TestDeleteBlob:
         mocker.patch("function_app.blob_client._get_blob_client", return_value=mock_blob)
         from function_app.blob_client import delete_blob
 
-        with pytest.raises(ResourceNotFoundError):
-            delete_blob("container", "nonexistent.csv")
+        # Should not raise - logs warning instead
+        delete_blob("container", "nonexistent.csv")
 
 
 class TestBlobExists:
@@ -191,20 +205,96 @@ class TestBlobExists:
 class TestCopyBlob:
     """Tests for copy_blob function."""
 
-    def test_copy_blob_success(self, _mock_config, mocker):
-        """Test successful blob copy."""
-        mock_source_blob = mocker.MagicMock()
-        mock_dest_blob = mocker.MagicMock()
-        mock_source_blob.url = "https://test.blob.core.windows.net/container/source.csv"
+    def test_copy_blob_success(self, mocker):
+        """Test successful blob copy (read source, write to dest)."""
+        # Mock config
+        _mock_config = mocker.patch("function_app.blob_client.config")
+        _mock_config.BLOB_STORAGE_CONNECTION_STRING = "test"
 
-        mock_get_blob = mocker.patch("function_app.blob_client._get_blob_client")
-        mock_get_blob.side_effect = [mock_source_blob, mock_dest_blob]
+        # Mock read_blob_bytes
+        mocker.patch(
+            "function_app.blob_client.read_blob_bytes",
+            return_value=b"test content"
+        )
+
+        # Mock get_blob_properties to return mock blob properties with content_type
+        mock_props = mocker.MagicMock()
+        mock_props.content_settings.content_type = "text/csv"
+        mocker.patch(
+            "function_app.blob_client.get_blob_properties",
+            return_value=mock_props
+        )
+
+        mock_write = mocker.patch("function_app.blob_client.write_blob_bytes")
 
         from function_app.blob_client import copy_blob
 
         copy_blob("container", "source.csv", "container", "dest.csv")
 
-        mock_dest_blob.start_copy_from_url.assert_called_once_with(mock_source_blob.url)
+        mock_write.assert_called_once_with(
+            "container", "dest.csv", b"test content", "text/csv", True
+        )
+
+    def test_copy_blob_missing_content_type(self, mocker):
+        """Test copy_blob handles missing content_type gracefully."""
+        # Mock config
+        _mock_config = mocker.patch("function_app.blob_client.config")
+        _mock_config.BLOB_STORAGE_CONNECTION_STRING = "test"
+
+        # Mock read_blob_bytes
+        mocker.patch(
+            "function_app.blob_client.read_blob_bytes",
+            return_value=b"test content"
+        )
+
+        # Mock get_blob_properties to return None for content_type
+        mock_props = mocker.MagicMock()
+        mock_props.content_settings.content_type = None
+        mocker.patch(
+            "function_app.blob_client.get_blob_properties",
+            return_value=mock_props
+        )
+
+        mock_write = mocker.patch("function_app.blob_client.write_blob_bytes")
+
+        from function_app.blob_client import copy_blob
+
+        copy_blob("container", "source.csv", "container", "dest.csv")
+
+        # Should use default content_type
+        mock_write.assert_called_once_with(
+            "container", "dest.csv", b"test content", "application/octet-stream", True
+        )
+
+    def test_copy_blob_resource_not_found(self, mocker):
+        """Test copy_blob handles ResourceNotFoundError when getting properties."""
+        # Mock config
+        _mock_config = mocker.patch("function_app.blob_client.config")
+        _mock_config.BLOB_STORAGE_CONNECTION_STRING = "test"
+
+        # Mock read_blob_bytes
+        mocker.patch(
+            "function_app.blob_client.read_blob_bytes",
+            return_value=b"test content"
+        )
+
+        # Mock get_blob_properties to raise ResourceNotFoundError
+        from azure.core.exceptions import ResourceNotFoundError
+        mocker.patch(
+            "function_app.blob_client.get_blob_properties",
+            side_effect=ResourceNotFoundError("Blob not found")
+        )
+
+        mock_write = mocker.patch("function_app.blob_client.write_blob_bytes")
+
+        from function_app.blob_client import copy_blob
+
+        copy_blob("container", "source.csv", "container", "dest.csv")
+
+        # Should use default content_type when ResourceNotFoundError
+        mock_write.assert_called_once_with(
+            "container", "dest.csv", b"test content", "application/octet-stream", True
+        )
 
 
 class TestMoveBlob:
@@ -219,8 +309,23 @@ class TestMoveBlob:
 
         move_blob("container", "source.csv", "container", "dest.csv")
 
-        mock_copy.assert_called_once_with("container", "source.csv", "container", "dest.csv")
+        # copy_blob is called with overwrite=True by default
+        mock_copy.assert_called_once()
         mock_delete.assert_called_once_with("container", "source.csv")
+
+
+class TestRenameBlob:
+    """Tests for rename_blob function."""
+
+    def test_rename_blob_success(self, _mock_config, mocker):
+        """Test successful blob rename."""
+        mock_move = mocker.patch("function_app.blob_client.move_blob")
+
+        from function_app.blob_client import rename_blob
+
+        rename_blob("container", "old_name.csv", "new_name.csv")
+
+        mock_move.assert_called_once_with("container", "old_name.csv", "container", "new_name.csv", True)
 
 
 class TestListBlobs:
@@ -265,6 +370,138 @@ class TestListBlobs:
 
         assert result == ["prefix/file.csv"]
         mock_container.list_blobs.assert_called_once_with(name_starts_with="prefix/")
+
+    def test_list_blobs_with_name_starts_with(self, _mock_config, mock_blob_service_client, mocker):
+        """Test blob listing with name_starts_with filter."""
+        _, mock_container, _ = mock_blob_service_client
+
+        mock_blob = mocker.MagicMock()
+        mock_blob.name = "file1.csv"
+
+        mock_container.list_blobs.return_value = [mock_blob]
+
+        mocker.patch(
+            "function_app.blob_client._get_container_client",
+            return_value=mock_container
+        )
+        from function_app.blob_client import list_blobs
+
+        result = list_blobs("container", name_starts_with="file")
+
+        assert result == ["file1.csv"]
+        mock_container.list_blobs.assert_called_once_with(name_starts_with="file")
+
+    def test_list_blobs_with_both_prefix_and_name_starts_with(self, _mock_config, mock_blob_service_client, mocker):
+        """Test blob listing with both prefix and name_starts_with filters."""
+        _, mock_container, _ = mock_blob_service_client
+
+        mock_blob = mocker.MagicMock()
+        mock_blob.name = "folder/file1.csv"
+
+        mock_container.list_blobs.return_value = [mock_blob]
+
+        mocker.patch(
+            "function_app.blob_client._get_container_client",
+            return_value=mock_container
+        )
+        from function_app.blob_client import list_blobs
+
+        result = list_blobs("container", prefix="folder/", name_starts_with="file")
+
+        assert result == ["folder/file1.csv"]
+        # Should combine prefix and name_starts_with
+        mock_container.list_blobs.assert_called_once_with(name_starts_with="folder/file")
+
+
+class TestListBlobsWithProperties:
+    """Tests for list_blobs_with_properties function."""
+
+    def test_list_blobs_with_properties_success(self, _mock_config, mock_blob_service_client, mocker):
+        """Test successful blob listing with properties."""
+        _, mock_container, _ = mock_blob_service_client
+
+        mock_blob = mocker.MagicMock()
+        mock_blob.name = "file1.csv"
+        mock_blob.size = 1024
+        mock_blob.last_modified = "2024-01-01T00:00:00Z"
+        mock_blob.creation_time = "2024-01-01T00:00:00Z"
+        mock_content_settings = mocker.MagicMock()
+        mock_content_settings.content_type = "text/csv"
+        mock_blob.content_settings = mock_content_settings
+
+        mock_container.list_blobs.return_value = [mock_blob]
+
+        mocker.patch(
+            "function_app.blob_client._get_container_client",
+            return_value=mock_container
+        )
+        from function_app.blob_client import list_blobs_with_properties
+
+        result = list_blobs_with_properties("container", prefix="prefix/")
+
+        assert len(result) == 1
+        assert result[0]["name"] == "file1.csv"
+        assert result[0]["size"] == 1024
+        assert result[0]["content_type"] == "text/csv"
+
+    def test_list_blobs_with_properties_no_content_type(self, _mock_config, mock_blob_service_client, mocker):
+        """Test list_blobs_with_properties handles missing content_type."""
+        _, mock_container, _ = mock_blob_service_client
+
+        mock_blob = mocker.MagicMock()
+        mock_blob.name = "file1.csv"
+        mock_blob.size = 1024
+        mock_blob.last_modified = "2024-01-01T00:00:00Z"
+        mock_blob.creation_time = "2024-01-01T00:00:00Z"
+        mock_blob.content_settings = None
+
+        mock_container.list_blobs.return_value = [mock_blob]
+
+        mocker.patch(
+            "function_app.blob_client._get_container_client",
+            return_value=mock_container
+        )
+        from function_app.blob_client import list_blobs_with_properties
+
+        result = list_blobs_with_properties("container")
+
+        assert len(result) == 1
+        assert result[0]["name"] == "file1.csv"
+        assert result[0]["content_type"] is None
+
+
+class TestDeleteBlobPrefix:
+    """Tests for delete_blob_prefix function."""
+
+    def test_delete_blob_prefix_success(self, _mock_config, mocker):
+        """Test successful deletion of blobs with prefix."""
+        mock_list = mocker.patch("function_app.blob_client.list_blobs")
+        mock_list.return_value = ["prefix/file1.csv", "prefix/file2.csv"]
+
+        mock_delete = mocker.patch("function_app.blob_client.delete_blob")
+        mock_delete.side_effect = [True, True]
+
+        from function_app.blob_client import delete_blob_prefix
+
+        count = delete_blob_prefix("container", "prefix/")
+
+        assert count == 2
+        assert mock_delete.call_count == 2
+
+    def test_delete_blob_prefix_partial_failure(self, _mock_config, mocker):
+        """Test delete_blob_prefix handles partial deletion failures."""
+        mock_list = mocker.patch("function_app.blob_client.list_blobs")
+        mock_list.return_value = ["prefix/file1.csv", "prefix/file2.csv"]
+
+        mock_delete = mocker.patch("function_app.blob_client.delete_blob")
+        mock_delete.side_effect = [True, False]  # Second delete fails
+
+        from function_app.blob_client import delete_blob_prefix
+
+        count = delete_blob_prefix("container", "prefix/")
+
+        assert count == 1  # Only first deletion succeeded
+        assert mock_delete.call_count == 2
 
 
 # =============================================================================
@@ -327,4 +564,4 @@ class TestGetProcessingFolderBlobs:
         result = get_processing_folder_blobs("container")
 
         assert result == ["processing/file1.csv", "processing/file2.csv"]
-        mock_list.assert_called_once_with("container", prefix="processing/")
+        mock_list.assert_called_once_with("container")

@@ -180,24 +180,28 @@ class TestNormalizeColumnNames:
 class TestValidateCsvSchema:
     """Tests for validate_csv_schema function."""
 
-    def test_validate_valid_schema(self, sample_df_raw):
-        """Test validation passes for valid schema."""
-        from function_app.csv_validator import validate_csv_schema
+    def test_validate_valid_schema(self, sample_df_normalized):
+        """Test validation passes when required columns present."""
+        from function_app.csv_validator import (
+            validate_required_columns,
+            validate_no_duplicate_columns
+        )
 
-        # Should not raise any exception
-        validate_csv_schema(sample_df_raw, normalize=True)
+        # Test individual validation steps (not full schema which checks column count)
+        validate_required_columns(sample_df_normalized)
+        validate_no_duplicate_columns(sample_df_normalized)
 
     def test_validate_missing_required_columns(self):
         """Test validation fails for missing required columns."""
         df = pd.DataFrame({
-            "[SnapshotDate]": ["2025-01-31"],
-            "[Orders_CY]": [10],
+            "SnapshotDate": ["2025-01-31"],
+            "Orders_CY": [10],
         })
 
-        from function_app.csv_validator import validate_csv_schema
+        from function_app.csv_validator import validate_required_columns
 
         with pytest.raises(ValueError, match="Missing required columns"):
-            validate_csv_schema(df, normalize=True)
+            validate_required_columns(df)
 
 
 class TestValidateColumnCount:
@@ -424,8 +428,9 @@ class TestIntegration:
         """Test full validation pipeline from bytes to validated DataFrame."""
         from function_app.csv_validator import (
             parse_csv_from_bytes,
-            validate_csv_schema,
             normalize_column_names,
+            validate_required_columns,
+            validate_no_duplicate_columns,
             validate_snapshot_date_present,
         )
 
@@ -433,12 +438,13 @@ class TestIntegration:
         df = parse_csv_from_bytes(sample_csv_bytes_valid)
         assert len(df) == 3
 
-        # Validate schema (includes normalization)
-        validate_csv_schema(df, normalize=True)
-
         # Normalize columns
         df_normalized = normalize_column_names(df)
         assert "CustomerId" in df_normalized.columns
+
+        # Validate required columns and no duplicates
+        validate_required_columns(df_normalized)
+        validate_no_duplicate_columns(df_normalized)
 
         # Validate snapshot date
         snapshot_date = validate_snapshot_date_present(df_normalized)

@@ -238,7 +238,7 @@ def score_customers(df: pd.DataFrame) -> pd.DataFrame:
     Score customers and generate reasons.
 
     Args:
-        df: Input DataFrame with 77 DAX feature columns
+        df: Input DataFrame with feature columns (76 expected)
 
     Returns:
         DataFrame with ChurnRiskPct, RiskBand, Reason_1-3, and all original columns
@@ -257,7 +257,7 @@ def score_customers(df: pd.DataFrame) -> pd.DataFrame:
     for col in date_cols:
         if col in df.columns:
             original_df[col] = df[col]
-    
+
     exclude_cols = ["FirstPurchaseDate", "LastPurchaseDate", "WillChurn90"]
     feature_cols = [
         c for c in df.columns

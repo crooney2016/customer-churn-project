@@ -5,8 +5,13 @@ This is the main entry point for the Azure Function App.
 Uses Python decorators to define triggers and bindings.
 
 Architecture:
-    Logic App (Timer + DAX Query) → Blob Storage → This Function
-    → CSV Parse → Score → SQL Upsert → Email
+    Logic App (Timer + DAX Query) → Blob Storage (CSV) → This Function
+    → Parse CSV → Validate Schema → Score (ML Model) → SQL Upsert
+    → POST HTML to Logic App (for notifications)
+
+Note: This function does NOT execute DAX queries or send emails directly.
+      DAX execution is handled by Logic App before this function runs.
+      Email notifications are handled by Logic App after receiving the HTML POST.
 """
 
 import logging
@@ -148,7 +153,7 @@ def score_http(req: func.HttpRequest) -> func.HttpResponse:
 
 
 @app.route(route="health", methods=["GET"], auth_level=func.AuthLevel.ANONYMOUS)
-def health_check(req: func.HttpRequest) -> func.HttpResponse:
+def health_check(req: func.HttpRequest) -> func.HttpResponse:  # pylint: disable=unused-argument
     """Health check endpoint for monitoring."""
     return func.HttpResponse("OK", status_code=200)
 
@@ -159,7 +164,7 @@ def health_check(req: func.HttpRequest) -> func.HttpResponse:
 
 def _run_pipeline(blob_data: bytes, blob_name: str, container_name: str) -> dict:
     """
-    Main pipeline: CSV → validate → score → SQL → move → email.
+    Main pipeline: CSV → validate → score → SQL → move → notify.
 
     Args:
         blob_data: CSV file content as bytes
@@ -167,7 +172,7 @@ def _run_pipeline(blob_data: bytes, blob_name: str, container_name: str) -> dict
         container_name: Name of the container
 
     Returns:
-        Dictionary with execution results
+        Dictionary with execution results including rows_scored, snapshot_date, etc.
     """
     import time
     start_time = time.time()
@@ -212,16 +217,55 @@ def _run_pipeline(blob_data: bytes, blob_name: str, container_name: str) -> dict
         new_blob_name = move_to_processed(container_name, blob_name, snapshot_date)
         logger.info("Moved to: %s", new_blob_name)
 
-        # Step 8: Send success email
-        step = "email"
+        # Step 8: Send success notification (POST HTML to Logic App)
+        step = "notify"
         duration = time.time() - start_time
         risk_dist = scored_df["RiskBand"].value_counts().to_dict()
+
+        # Calculate model metrics
+        if "ChurnRiskPct" in scored_df.columns:
+            avg_risk = float(scored_df["ChurnRiskPct"].mean())
+            median_risk = float(scored_df["ChurnRiskPct"].median())
+        else:
+            avg_risk = None
+            median_risk = None
+
+        # Calculate top reasons (most common reasons across all customers)
+        top_reasons = {}
+        reason_cols = ["Reason_1", "Reason_2", "Reason_3"]
+        for col in reason_cols:
+            if col in scored_df.columns:
+                reason_counts = scored_df[col].value_counts()
+                for reason, count in reason_counts.items():
+                    # Skip NaN/None values and empty strings
+                    # Use explicit None check and string conversion to avoid pandas boolean issues
+                    if reason is None:
+                        continue
+                    # Convert to string first, then check if it's empty or represents NaN
+                    reason_str = str(reason).strip()
+                    if not reason_str or reason_str.lower() in ('nan', 'none', ''):
+                        continue
+                    top_reasons[reason_str] = top_reasons.get(reason_str, 0) + int(count)
+
+        # Get top 10 most common reasons
+        sorted_items = sorted(top_reasons.items(), key=lambda x: x[1], reverse=True)
+        top_reasons_sorted = dict(sorted_items[:10])
+
+        # Model AUC would typically come from model metadata file
+        # For now, we'll leave it as None (can be added later from model registry)
+        model_auc = None
+        model_version = "XGBoost v1.0"
 
         send_success_email(
             row_count=len(scored_df),
             snapshot_date=snapshot_date,
             duration_seconds=duration,
-            risk_distribution=risk_dist
+            risk_distribution=risk_dist,
+            avg_risk=avg_risk,
+            median_risk=median_risk,
+            top_reasons=top_reasons_sorted,
+            model_auc=model_auc,
+            model_version=model_version
         )
 
         return {
@@ -247,15 +291,15 @@ def _run_pipeline(blob_data: bytes, blob_name: str, container_name: str) -> dict
         except (OSError, IOError, RuntimeError) as move_err:
             logger.error("Failed to move file to error folder: %s", str(move_err))
 
-        # Send failure email
+        # Send failure notification (POST HTML to Logic App)
         try:
             send_failure_email(
                 error_type=type(e).__name__,
                 error_message=error_message,
                 step=step
             )
-        except (ConnectionError, TimeoutError, OSError) as email_err:
-            logger.error("Failed to send error email: %s", str(email_err))
+        except (ConnectionError, TimeoutError, OSError) as notify_err:
+            logger.error("Failed to send error notification: %s", str(notify_err))
 
         raise
 

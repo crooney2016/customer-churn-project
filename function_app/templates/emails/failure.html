@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Churn Prediction Pipeline - Failure</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f4;">
+        <tr>
+            <td align="center" style="padding: 20px 0;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="1000" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <!-- Header -->
+                    <tr>
+                        <td style="background-color: #dc3545; padding: 30px 40px; border-radius: 8px 8px 0 0;">
+                            <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: bold;">
+                                ✗ Pipeline Execution Failed
+                            </h1>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 20px 0; color: #333333; font-size: 16px; line-height: 1.6;">
+                                The churn prediction pipeline encountered an error and could not complete successfully.
+                            </p>
+                            
+                            <!-- Error Details Table -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 30px 0; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057; width: 150px;">
+                                        Pipeline Step
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        {{ step }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057;">
+                                        Error Type
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #dc3545; font-weight: bold;">
+                                        {{ error_type }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 12px; background-color: #f8f9fa; border: 1px solid #dee2e6; font-weight: bold; color: #495057; vertical-align: top;">
+                                        Error Message
+                                    </td>
+                                    <td style="padding: 12px; border: 1px solid #dee2e6; color: #333333;">
+                                        <pre style="margin: 0; padding: 10px; background-color: #f8f9fa; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; word-wrap: break-word; color: #dc3545;">{{ error_message }}</pre>
+                                    </td>
+                                </tr>
+                            </table>
+                            
+                            <!-- Action Required -->
+                            <div style="margin: 30px 0; padding: 15px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                                <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.6;">
+                                    <strong>Action Required:</strong> Please review the error details above and investigate the issue. 
+                                    The pipeline file has been moved to the error folder for further analysis.
+                                </p>
+                            </div>
+                            
+                            <p style="margin: 30px 0 0 0; color: #666666; font-size: 14px; line-height: 1.6;">
+                                This is an automated notification from the Churn Prediction Pipeline.
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8f9fa; padding: 20px 40px; border-radius: 0 0 8px 8px; border-top: 1px solid #dee2e6;">
+                            <p style="margin: 0; color: #6c757d; font-size: 12px; text-align: center;">
+                                Generated at {{ timestamp }}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

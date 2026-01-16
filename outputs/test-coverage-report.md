@@ -29,7 +29,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Above threshold, good coverage.
 
-#### Missing Coverage
+#### csv_validator Missing Coverage
 
 - Lines 100, 102, 104: Edge case error handling
 - Lines 196-199: Optional validation paths
@@ -37,7 +37,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 - Lines 360-361, 378-379, 385, 392: Error handling paths
 - Lines 506, 509-511: Edge case handling
 
-#### Recommendations
+#### csv_validator Recommendations
 
 - Add tests for edge cases in validation logic
 - Test error handling paths for malformed CSV data
@@ -49,14 +49,14 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Close to threshold, needs improvement.
 
-#### Missing Coverage
+#### sql_client Missing Coverage
 
 - Lines 47-66: Connection error handling
 - Lines 88-98: Transaction rollback scenarios
 - Line 210: Edge case error handling
 - Line 246: Final error handling path
 
-#### Recommendations
+#### sql_client Recommendations
 
 - Add tests for connection failures
 - Test transaction rollback scenarios thoroughly
@@ -69,7 +69,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Below threshold, needs improvement.
 
-#### Missing Coverage
+#### config Missing Coverage
 
 - Lines 17-19: Dotenv import error handling
 - Line 117: Email recipients validation edge case
@@ -77,7 +77,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 - Line 154: Email recipients parsing
 - Lines 173-175: Final exception handling
 
-#### Recommendations
+#### config Recommendations
 
 - Add tests for dotenv import failures
 - Test edge cases in email recipients validation
@@ -90,14 +90,14 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Below threshold, needs significant improvement.
 
-#### Missing Coverage
+#### scorer Missing Coverage
 
 - Line 178: Feature processing edge case
 - Line 184: Data normalization edge case
 - Lines 217-233: Complex risk band calculation logic
 - Lines 247-323: Reason generation and feature phrase logic
 
-#### Recommendations
+#### scorer Recommendations
 
 - Add tests for edge cases in risk band calculation
 - Test reason generation with various feature combinations
@@ -110,12 +110,12 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** New stub module, needs implementation and tests.
 
-#### Missing Coverage
+#### email_client Missing Coverage
 
 - Lines 29-35: Success email sending logic
 - Line 51: Failure email sending logic
 
-#### Recommendations
+#### email_client Recommendations
 
 - This is a stub module - needs full implementation
 - Once implemented, add comprehensive tests
@@ -127,7 +127,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Critical gap, needs major improvement.
 
-#### Missing Coverage (Major Sections)
+#### blob_client Missing Coverage
 
 - Lines 65-71: Connection initialization error handling
 - Lines 84-85: Configuration validation
@@ -148,7 +148,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 - Lines 606-626, 644-664: Integration operations
 - Lines 682-699, 725-729: Final error handling
 
-#### Recommendations
+#### blob_client Recommendations
 
 - Add comprehensive tests for all blob operations
 - Test error handling and retry logic
@@ -162,19 +162,19 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Critical gap, needs major improvement.
 
-#### Missing Coverage (Major Sections)
+#### function_app Missing Coverage
 
 - Lines 50-160: Main pipeline logic (`run_pipeline_from_blob`)
 - Lines 178-196: URL-based pipeline (`run_pipeline_from_url`)
 - Line 220: Legacy pipeline functions
 
-#### Current Test Issues
+#### function_app Test Issues
 
 - Tests are failing due to missing module imports (`get_dax_query_from_dataset`)
 - Need to mock dependencies properly
 - Integration tests need fixing
 
-#### Recommendations
+#### function_app Recommendations
 
 - Fix test mocks for missing dependencies
 - Add comprehensive tests for `run_pipeline_from_blob`
@@ -189,7 +189,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 
 **Status:** Critical gap, but lower priority.
 
-#### Missing Coverage
+#### init Missing Coverage
 
 - Lines 16-17: Lazy import functions
 - Lines 22-23: Lazy import functions
@@ -199,7 +199,7 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 - Lines 127-160: HTTP trigger handlers
 - Lines 168-174: Health check handler
 
-#### Recommendations
+#### init Recommendations
 
 - Add tests for Azure Function entry points
 - Test blob trigger handler logic
@@ -212,16 +212,19 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 ### Critical Test Failures
 
 1. **`test_function_app.py`** - 3 failures
+
 - Issue: Missing module `get_dax_query_from_dataset`
 - Impact: Cannot test main pipeline logic
 - Action: Fix test mocks or implement missing module
 
 1. **`test_blob_client.py`** - 15 errors
+
 - Issue: Import or setup errors
 - Impact: Blob operations cannot be tested
 - Action: Fix test setup and mocks
 
 1. **`test_csv_validator.py`** - 3 failures
+
 - Issue: Column count validation too strict for test data
 - Impact: Some validation tests fail
 - Action: Adjust test data or validation logic
@@ -229,16 +232,19 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 ### Other Test Failures
 
 1. **`test_config.py`** - 2 failures
+
 - Issue: Environment variable handling in tests
 - Impact: Some config tests fail
 - Action: Fix test environment setup
 
 1. **`test_scorer.py`** - 2 failures
+
 - Issue: Test assertions don't match actual behavior
 - Impact: Some scoring tests fail
 - Action: Update test expectations or fix implementation
 
 1. **`test_review_rules.py`** - 2 failures
+
 - Issue: Missing rule files or output reference
 - Impact: Rule validation tests fail
 - Action: Add missing files or update references
@@ -248,72 +254,86 @@ The test suite currently covers **53.16%** of `function_app/` code, which is bel
 ### Critical Paths (High Priority)
 
 1. **Pipeline Error Handling** (`function_app.py`)
+
 - File movement to error folder
 - Failure email notifications
 - Transaction rollbacks
 
 1. **Blob Operations** (`blob_client.py`)
+
 - All blob read/write operations
 - Error handling and retries
 - Snapshot date extraction
 
 1. **Data Integrity** (`sql_client.py`)
+
 - Transaction rollback scenarios
 - Connection failure handling
 
 ### Important Paths (Medium Priority)
 
 1. **Risk Band Calculation** (`scorer.py`)
+
 - Edge cases in risk band logic
 - Reason generation for various scenarios
 
 1. **Configuration Validation** (`config.py`)
+
 - Edge cases in environment variable validation
 - Email recipients parsing
 
 1. **Azure Function Entry Points** (`__init__.py`)
+
 - Trigger handlers
 - HTTP endpoints
 
 ### Nice-to-Have Paths (Low Priority)
 
 1. **Edge Case Error Handling**
+
 - Dotenv import failures
 - Optional validation paths
 
 1. **Email Client** (`email_client.py`)
+
 - Currently just a stub, low priority until implemented
 
-## Recommendations
+## Action Recommendations
 
 ### Immediate Actions (To Reach 80% Coverage)
 
 1. **Fix Test Failures**
+
 - 🔴 High: Fix `test_function_app.py` and `test_blob_client.py` errors
 - 🟡 Medium: Fix remaining test failures
 - Target: All tests passing before improving coverage
 
 1. **Add Tests for Critical Modules**
+
 - 🔴 High: Add tests for `blob_client.py` (currently 27%)
 - 🔴 High: Add tests for `function_app.py` (currently 17%)
 - 🟡 Medium: Improve `sql_client.py` coverage to 80%+
 
 1. **Improve Coverage for Core Logic**
+
 - 🟡 Medium: Add tests for edge cases in `scorer.py`
 - 🟡 Medium: Add tests for configuration edge cases
 
 ### Long-Term Improvements
 
 1. **Test Organization**
+
 - Review test fixtures and helpers
 - Ensure test isolation
 - Improve test maintainability
 
 1. **Integration Tests**
+
 - Add proper integration tests with proper markers
 - Test end-to-end pipeline scenarios
 
 1. **Coverage Tools**
+
 - Set up coverage reporting in CI/CD
 - Add coverage badges to README
 - Track coverage trends over time
@@ -364,7 +384,7 @@ The test suite has a solid foundation with **85 passing tests**, but **significa
 - Main pipeline logic (17% coverage)
 - Azure Function entry points (18% coverage)
 
-#### To reach the 80% threshold
+### To Reach the 80% Threshold
 
 1. Fix all test failures (priority 1)
 1. Add comprehensive tests for `blob_client.py` and `function_app.py` (priority 2)
@@ -374,7 +394,7 @@ The test suite has a solid foundation with **85 passing tests**, but **significa
 
 ---
 
-#### Next Steps
+### Next Steps
 
 1. Review this report with the team
 1. Prioritize action items

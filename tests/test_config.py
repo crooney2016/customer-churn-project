@@ -15,16 +15,11 @@ import function_app.config  # pylint: disable=unused-import
 def test_config_loads_from_env(monkeypatch):
     """Test that Config loads values from environment variables."""
     monkeypatch.setenv("SQL_CONNECTION_STRING", "test_conn_string")
-    monkeypatch.setenv("PBI_TENANT_ID", "test_tenant_id")
-    monkeypatch.setenv("PBI_CLIENT_ID", "test_client_id")
-    monkeypatch.setenv("PBI_CLIENT_SECRET", "test_secret")
-    monkeypatch.setenv("PBI_WORKSPACE_ID", "test_workspace_id")
-    monkeypatch.setenv("PBI_DATASET_ID", "test_dataset_id")
-    monkeypatch.setenv("EMAIL_TENANT_ID", "test_email_tenant_id")
-    monkeypatch.setenv("EMAIL_CLIENT_ID", "test_email_client_id")
-    monkeypatch.setenv("EMAIL_CLIENT_SECRET", "test_email_secret")
-    monkeypatch.setenv("EMAIL_SENDER", "test@example.com")
-    monkeypatch.setenv("EMAIL_RECIPIENTS", "recipient1@example.com,recipient2@example.com")
+    monkeypatch.setenv(
+        "BLOB_STORAGE_CONNECTION_STRING",
+        "DefaultEndpointsProtocol=https;AccountName=test"
+    )
+    monkeypatch.setenv("BLOB_STORAGE_CONTAINER_NAME", "test-container")
 
     # Reload config module to pick up new env vars
     config_module: ModuleType = importlib.reload(
@@ -33,8 +28,7 @@ def test_config_loads_from_env(monkeypatch):
 
     config = config_module.Config()
     assert config.SQL_CONNECTION_STRING == "test_conn_string"
-    assert config.PBI_TENANT_ID == "test_tenant_id"
-    assert config.EMAIL_RECIPIENTS == "recipient1@example.com,recipient2@example.com"
+    assert config.BLOB_STORAGE_CONTAINER_NAME == "test-container"
 
 
 def test_config_raises_on_missing_required(monkeypatch):
@@ -42,69 +36,66 @@ def test_config_raises_on_missing_required(monkeypatch):
     # Remove all required env vars
     required_vars = [
         "SQL_CONNECTION_STRING",
-        "PBI_TENANT_ID",
-        "PBI_CLIENT_ID",
-        "PBI_CLIENT_SECRET",
-        "PBI_WORKSPACE_ID",
-        "PBI_DATASET_ID",
-        "EMAIL_TENANT_ID",
-        "EMAIL_CLIENT_ID",
-        "EMAIL_CLIENT_SECRET",
-        "EMAIL_SENDER",
-        "EMAIL_RECIPIENTS",
+        "BLOB_STORAGE_CONNECTION_STRING",
     ]
 
     for var in required_vars:
         monkeypatch.delenv(var, raising=False)
 
-    # Reload config module
-    config_module: ModuleType = importlib.reload(
-        sys.modules['function_app.config']
-    )
-
-    # Pydantic raises ValidationError, but our code wraps it in ValueError
-    with pytest.raises((ValueError, Exception)):
-        config_module.Config()
+    # Reloading config module should raise ValueError during module-level instantiation
+    with pytest.raises(ValueError, match="Configuration validation failed"):
+        importlib.reload(sys.modules['function_app.config'])
 
 
-def test_config_get_email_recipients():
-    """Test that get_email_recipients parses comma-separated recipients."""
-    # This test requires a valid config instance
-    # In practice, this is tested with actual config loading
-    recipients_str = "user1@example.com,user2@example.com, user3@example.com "
-    # Parse manually to test logic
-    recipients = [r.strip() for r in recipients_str.split(",") if r.strip()]
-    assert len(recipients) == 3
-    assert "user1@example.com" in recipients
-    assert "user2@example.com" in recipients
-    assert "user3@example.com" in recipients
-
-
-def test_config_dax_query_name_optional(monkeypatch):
-    """Test that DAX_QUERY_NAME is optional."""
-    # Set all required vars
-    required_vars = {
-        "SQL_CONNECTION_STRING": "test",
-        "PBI_TENANT_ID": "test",
-        "PBI_CLIENT_ID": "test",
-        "PBI_CLIENT_SECRET": "test",
-        "PBI_WORKSPACE_ID": "test",
-        "PBI_DATASET_ID": "test",
-        "EMAIL_TENANT_ID": "test",
-        "EMAIL_CLIENT_ID": "test",
-        "EMAIL_CLIENT_SECRET": "test",
-        "EMAIL_SENDER": "test@example.com",
-        "EMAIL_RECIPIENTS": "test@example.com",
-    }
-    for key, value in required_vars.items():
-        monkeypatch.setenv(key, value)
-
-    # Don't set DAX_QUERY_NAME
-    monkeypatch.delenv("DAX_QUERY_NAME", raising=False)
+def test_config_container_name_has_default(monkeypatch):
+    """Test that BLOB_STORAGE_CONTAINER_NAME has a default value."""
+    monkeypatch.setenv("SQL_CONNECTION_STRING", "test")
+    monkeypatch.setenv("BLOB_STORAGE_CONNECTION_STRING", "test")
+    monkeypatch.delenv("BLOB_STORAGE_CONTAINER_NAME", raising=False)
 
     config_module: ModuleType = importlib.reload(
         sys.modules['function_app.config']
     )
 
     config = config_module.Config()
-    assert config.DAX_QUERY_NAME is None
+    assert config.BLOB_STORAGE_CONTAINER_NAME == "churn-feature-data"
+
+
+def test_config_logic_app_endpoint_optional(monkeypatch):
+    """Test that LOGIC_APP_ENDPOINT is optional."""
+    monkeypatch.setenv("SQL_CONNECTION_STRING", "test")
+    monkeypatch.setenv("BLOB_STORAGE_CONNECTION_STRING", "test")
+    monkeypatch.delenv("LOGIC_APP_ENDPOINT", raising=False)
+
+    config_module: ModuleType = importlib.reload(
+        sys.modules['function_app.config']
+    )
+
+    config = config_module.Config()
+    assert config.LOGIC_APP_ENDPOINT is None
+
+
+def test_config_validate_method(monkeypatch):
+    """Test the validate() method checks required fields."""
+    monkeypatch.setenv("SQL_CONNECTION_STRING", "test")
+    monkeypatch.setenv("BLOB_STORAGE_CONNECTION_STRING", "test")
+
+    config_module: ModuleType = importlib.reload(
+        sys.modules['function_app.config']
+    )
+
+    config = config_module.Config()
+    # Should not raise
+    config.validate()
+
+
+def test_config_validate_raises_on_empty(monkeypatch):
+    """Test that validate() raises on empty required fields."""
+    # This test simulates a scenario where fields exist but are empty
+    # Pydantic's min_length=1 should catch this during module-level instantiation
+    monkeypatch.setenv("SQL_CONNECTION_STRING", "")
+    monkeypatch.setenv("BLOB_STORAGE_CONNECTION_STRING", "test")
+
+    # Reloading config module should raise ValueError during module-level instantiation
+    with pytest.raises(ValueError, match="Configuration validation failed"):
+        importlib.reload(sys.modules['function_app.config'])
