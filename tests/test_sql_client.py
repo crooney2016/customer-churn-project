@@ -416,6 +416,21 @@ class TestGetConnection:
         with pytest.raises(AttributeError):
             get_connection()
 
+    def test_get_connection_network_error(self, mocker):
+        """Test get_connection handles network errors with retry."""
+        import pymssql
+        mocker.patch.dict("os.environ", {
+            "SQL_CONNECTION_STRING": "Server=test;Database=db;UID=user;PWD=pass;"
+        })
+        mocker.patch(
+            "function_app.sql_client.pymssql.connect",
+            side_effect=pymssql.OperationalError("Network error")
+        )
+
+        # Should retry and eventually raise
+        with pytest.raises(pymssql.OperationalError):
+            get_connection()
+
     def test_get_connection_invalid_connection_string(self, mocker):
         """Test get_connection handles invalid connection string."""
         mocker.patch("function_app.sql_client.config.SQL_CONNECTION_STRING", "invalid")
@@ -426,6 +441,6 @@ class TestGetConnection:
             result = _parse_connection_string("invalid")
             # If parsing succeeds, connection will fail at connect() stage
             assert "server" in result or result == {}
-        except Exception:
+        except (ValueError, AttributeError):
             # Parsing failed - that's okay for invalid input
             pass

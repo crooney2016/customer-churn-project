@@ -198,3 +198,43 @@ def test_send_failure_email_template_error_handled(mock_post, mocker):
     )
 
     assert not mock_post.called
+
+
+def test_jinja2_environment_initialization_error(mocker):
+    """Test email client handles Jinja2 environment initialization errors."""
+    from function_app.email_client import send_success_email
+
+    # Mock Jinja2 Environment to raise error on initialization
+    mocker.patch(
+        "function_app.email_client.Environment",
+        side_effect=Exception("Jinja2 initialization failed")
+    )
+
+    # Should not raise (logs error but doesn't fail)
+    send_success_email(
+        row_count=100,
+        snapshot_date="2025-01-31",
+        duration_seconds=1.5,
+        risk_distribution={"High": 10, "Medium": 50, "Low": 40}
+    )
+
+
+def test_template_rendering_error(mocker):
+    """Test email client handles template rendering errors."""
+    from function_app.email_client import send_success_email
+    from jinja2 import TemplateError
+
+    mock_env = mocker.MagicMock()
+    mock_template = mocker.MagicMock()
+    mock_template.render.side_effect = TemplateError("Template error")
+    mock_env.get_template.return_value = mock_template
+
+    mocker.patch("function_app.email_client.Environment", return_value=mock_env)
+
+    # Should not raise (logs error but doesn't fail)
+    send_success_email(
+        row_count=100,
+        snapshot_date="2025-01-31",
+        duration_seconds=1.5,
+        risk_distribution={"High": 10, "Medium": 50, "Low": 40}
+    )

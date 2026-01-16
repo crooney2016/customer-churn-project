@@ -112,11 +112,19 @@ def test_score_customers_structure(mocker):
     """Test that score_customers returns expected structure."""
     # Mock model loading to avoid requiring actual model files
     mock_model = mocker.MagicMock()
+    # predict_proba returns shape (n_samples, 2) for binary classification
     mock_model.predict_proba.return_value = np.array([
-        [0.8, 0.2], [0.5, 0.5], [0.3, 0.7]
+        [0.2, 0.8], [0.5, 0.5], [0.7, 0.3]  # [prob_class_0, prob_class_1]
     ])
     mock_booster = mocker.MagicMock()
-    # Predict should return contributions with BIAS column (6 features + BIAS = 7 columns)
+    # Predict should return contributions with BIAS column
+    # Need to match the number of features in model_columns
+    # The actual model has many more features, but for testing we use 6
+    feature_cols = [
+        "Orders_CY", "Spend_CY", "DaysSinceLast",
+        "Segment_FITNESS", "Segment_FARRELL", "CostCenter_CMFIT"
+    ]
+    # Contributions: 6 features + BIAS = 7 columns, 3 rows
     mock_booster.predict.return_value = np.array([
         [0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.0],  # 6 features + BIAS
         [0.05, 0.15, 0.25, 0.15, 0.15, 0.1, 0.0],  # 6 features + BIAS
@@ -130,10 +138,6 @@ def test_score_customers_structure(mocker):
     mock_dmatrix.return_value = mock_dmatrix_instance
 
     mock_load = mocker.patch("function_app.scorer.load_model")
-    feature_cols = [
-        "Orders_CY", "Spend_CY", "DaysSinceLast",
-        "Segment_FITNESS", "Segment_FARRELL", "CostCenter_CMFIT"
-    ]
     mock_load.return_value = (mock_model, feature_cols)
 
     df = pd.DataFrame({
@@ -160,57 +164,111 @@ def test_score_customers_structure(mocker):
     assert "CustomerId" in result.columns
     assert "SnapshotDate" in result.columns
     assert len(result) == 3
+    # Verify ChurnRiskPct values match predict_proba[:, 1]
+    assert result["ChurnRiskPct"].iloc[0] == 0.8
+    assert result["ChurnRiskPct"].iloc[1] == 0.5
+    assert result["ChurnRiskPct"].iloc[2] == 0.3
 
 
 def test_load_model_missing_model_file(mocker):  # pylint: disable=unused-argument
     """Test load_model raises FileNotFoundError when model file is missing."""
-    from unittest.mock import patch
+    from unittest.mock import patch, MagicMock
 
-    # Mock Path.exists at the instance level
-    call_count = [0]
+    # Create a mock Path that returns False for model file
+    mock_model_path = MagicMock()
+    mock_model_path.exists.return_value = False
+    mock_model_path.__str__ = lambda x: "/path/to/churn_model.pkl"
 
-    def mock_path_exists(self):
-        call_count[0] += 1
-        path_str = str(self)
-        # First check is for model file
-        if call_count[0] == 1 and "churn_model.pkl" in path_str:
-            return False  # Model file missing
-        # Other paths return True (to avoid other issues)
-        return True
+    mock_model_columns_path = MagicMock()
+    mock_model_columns_path.exists.return_value = True
+    mock_model_columns_path.__str__ = lambda x: "/path/to/model_columns.pkl"
 
-    with patch("pathlib.Path.exists", mock_path_exists):
+    # Mock Path constructor to return our mock paths
+    def mock_path_init(self, *args):
+        path_str = str(args[0]) if args else ""
+        if "churn_model.pkl" in path_str:
+            return mock_model_path
+        if "model_columns.pkl" in path_str:
+            return mock_model_columns_path
+        # Default mock path
+        mock_default = MagicMock()
+        mock_default.exists.return_value = True
+        return mock_default
+
+    with patch("function_app.scorer.Path", side_effect=lambda *args: mock_path_init(None, *args)):
         with pytest.raises(FileNotFoundError, match="Model file not found"):
             load_model()
 
 def test_load_model_missing_model_columns_file(mocker):  # pylint: disable=unused-argument
     """Test load_model raises FileNotFoundError when model_columns file is missing."""
-    from unittest.mock import patch, mock_open
+    from unittest.mock import patch, MagicMock
 
-    # Track which file is being checked
-    call_count = [0]
+    # Create mock paths
+    mock_model_path = MagicMock()
+    mock_model_path.exists.return_value = True
+    mock_model_path.__str__ = lambda x: "/path/to/churn_model.pkl"
 
-    def mock_path_exists(self):
-        call_count[0] += 1
-        path_str = str(self)
-        # First check is for model file (should exist)
-        if call_count[0] == 1 and "churn_model.pkl" in path_str:
-            return True  # Model file exists
-        # Second check is for columns file (should not exist)
-        if call_count[0] == 2 and "model_columns.pkl" in path_str:
-            return False  # Columns file missing
-        # Other paths
-        return True
+    mock_model_columns_path = MagicMock()
+    mock_model_columns_path.exists.return_value = False  # Columns file missing
+    mock_model_columns_path.__str__ = lambda x: "/path/to/model_columns.pkl"
 
-    with patch("pathlib.Path.exists", mock_path_exists):
-        # Mock file opening since model file "exists" but we don't want to actually read it
-        with patch("builtins.open", mock_open(read_data=b"")):
-            with patch("pickle.load", side_effect=EOFError("Ran out of input")):
-                # Should raise FileNotFoundError for missing columns file, not EOFError
-                try:
-                    load_model()
-                    assert False, "Should have raised FileNotFoundError"
-                except FileNotFoundError as e:
-                    assert "Model columns file not found" in str(e)
+    # Mock Path constructor
+    def mock_path_init(self, *args):
+        path_str = str(args[0]) if args else ""
+        if "churn_model.pkl" in path_str:
+            return mock_model_path
+        if "model_columns.pkl" in path_str:
+            return mock_model_columns_path
+        # Default mock path
+        mock_default = MagicMock()
+        mock_default.exists.return_value = True
+        return mock_default
+
+    with patch("function_app.scorer.Path", side_effect=lambda *args: mock_path_init(None, *args)):
+        with pytest.raises(FileNotFoundError, match="Model columns file not found"):
+            load_model()
+
+
+def test_score_customers_model_loading_error(mocker):
+    """Test score_customers handles model loading errors."""
+    mock_load = mocker.patch("function_app.scorer.load_model")
+    mock_load.side_effect = FileNotFoundError("Model file not found")
+
+    df = pd.DataFrame({
+        "CustomerId": ["001"],
+        "SnapshotDate": pd.to_datetime(["2024-01-01"]),
+        "Orders_CY": [10],
+    })
+
+    with pytest.raises(FileNotFoundError, match="Model file not found"):
+        score_customers(df)
+
+
+def test_score_customers_preprocessing_error(mocker):
+    """Test score_customers handles preprocessing errors."""
+    mock_model = mocker.MagicMock()
+    mock_model.predict_proba.return_value = np.array([[0.2, 0.8]])
+    mock_booster = mocker.MagicMock()
+    mock_booster.predict.return_value = np.array([[0.1, 0.2, 0.3, 0.1, 0.1, 0.1, 0.0]])
+    mock_model.get_booster.return_value = mock_booster
+
+    mock_load = mocker.patch("function_app.scorer.load_model")
+    mock_load.return_value = (mock_model, ["Orders_CY", "Spend_CY", "DaysSinceLast"])
+
+    mocker.patch("function_app.scorer.xgb.DMatrix")
+
+    # Mock preprocess to raise error
+    mock_preprocess = mocker.patch("function_app.scorer.preprocess")
+    mock_preprocess.side_effect = ValueError("Preprocessing error")
+
+    df = pd.DataFrame({
+        "CustomerId": ["001"],
+        "SnapshotDate": pd.to_datetime(["2024-01-01"]),
+        "Orders_CY": [10],
+    })
+
+    with pytest.raises(ValueError, match="Preprocessing error"):
+        score_customers(df)
 
 
 @pytest.mark.integration

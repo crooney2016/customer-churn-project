@@ -476,3 +476,140 @@ class TestIntegration:
 
         # Should not raise
         validate_column_count(df)
+
+
+# =============================================================================
+# Tests for validate_csv_schema wrapper function
+# =============================================================================
+
+class TestValidateCsvSchema:
+    """Tests for validate_csv_schema wrapper function."""
+
+    def test_validate_csv_schema_success(self, sample_df_normalized):
+        """Test validate_csv_schema with valid DataFrame."""
+        from function_app.csv_validator import validate_csv_schema
+
+        # Add more columns to reach expected count
+        df = sample_df_normalized.copy()
+        for i in range(70):
+            df[f"Feature_{i}"] = [i, i + 1, i + 2]
+
+        # Should not raise
+        validate_csv_schema(df, normalize=False)
+
+    def test_validate_csv_schema_with_normalize(self):
+        """Test validate_csv_schema with normalization enabled."""
+        from function_app.csv_validator import validate_csv_schema
+
+        # DataFrame with bracketed column names
+        df = pd.DataFrame({
+            "[SnapshotDate]": ["2025-01-31", "2025-01-31"],
+            "Customers[account_Order]": ["001", "002"],
+            "Customers[account_Name]": ["Account A", "Account B"],
+            "Customers[Segment]": ["FITNESS", "FARRELL"],
+            "Customers[Cost Center]": ["CMFIT", "CMFIT"],
+        })
+
+        # Add feature columns
+        for i in range(70):
+            df[f"[Feature_{i}]"] = [i, i + 1]
+
+        # Should normalize and validate successfully
+        validate_csv_schema(df, normalize=True)
+
+    def test_validate_csv_schema_missing_columns(self, sample_df_normalized):
+        """Test validate_csv_schema fails with missing required columns."""
+        from function_app.csv_validator import validate_csv_schema
+
+        # Remove required column
+        df = sample_df_normalized.drop(columns=["CustomerId"])
+
+        with pytest.raises(ValueError, match="Missing required columns"):
+            validate_csv_schema(df, normalize=False)
+
+    def test_validate_csv_schema_wrong_column_count(self, sample_df_normalized):
+        """Test validate_csv_schema fails with wrong column count."""
+        from function_app.csv_validator import validate_csv_schema
+
+        # Too few columns
+        df = sample_df_normalized.copy()
+
+        with pytest.raises(ValueError, match="Column count"):
+            validate_csv_schema(df, normalize=False)
+
+    def test_validate_csv_schema_duplicate_columns(self):
+        """Test validate_csv_schema fails with duplicate columns."""
+        from function_app.csv_validator import validate_csv_schema
+
+        df = pd.DataFrame({
+            "CustomerId": ["001", "002"],
+            "CustomerId": ["001", "002"],  # Duplicate
+            "SnapshotDate": ["2025-01-31", "2025-01-31"],
+        })
+
+        # Add more columns
+        for i in range(70):
+            df[f"Feature_{i}"] = [i, i + 1]
+
+        with pytest.raises(ValueError, match="Duplicate columns"):
+            validate_csv_schema(df, normalize=False)
+
+
+# =============================================================================
+# Tests for validate_column_patterns
+# =============================================================================
+
+class TestValidateColumnPatterns:
+    """Tests for validate_column_patterns function."""
+
+    def test_validate_column_patterns_customer_prefix(self):
+        """Test validate_column_patterns with customer prefix columns."""
+        from function_app.csv_validator import validate_column_patterns
+
+        df = pd.DataFrame({
+            "Customers[account_Order]": ["001", "002"],
+            "Customers[account_Name]": ["Account A", "Account B"],
+            "Customers[Segment]": ["FITNESS", "FARRELL"],
+        })
+
+        # Should not raise (only logs warnings)
+        validate_column_patterns(df)
+
+    def test_validate_column_patterns_feature_prefix(self):
+        """Test validate_column_patterns with feature prefix columns."""
+        from function_app.csv_validator import validate_column_patterns
+
+        df = pd.DataFrame({
+            "[Orders_CY]": [10, 20],
+            "[Spend_CY]": [5000.0, 10000.0],
+            "[Units_CY]": [100, 200],
+        })
+
+        # Should not raise (only logs warnings)
+        validate_column_patterns(df)
+
+    def test_validate_column_patterns_mixed_prefixes(self):
+        """Test validate_column_patterns with mixed prefix columns."""
+        from function_app.csv_validator import validate_column_patterns
+
+        df = pd.DataFrame({
+            "Customers[account_Order]": ["001", "002"],
+            "[Orders_CY]": [10, 20],
+            "OtherColumn": ["A", "B"],  # No prefix
+        })
+
+        # Should not raise (logs warning for OtherColumn)
+        validate_column_patterns(df)
+
+    def test_validate_column_patterns_no_prefix(self):
+        """Test validate_column_patterns with columns without expected prefixes."""
+        from function_app.csv_validator import validate_column_patterns
+
+        df = pd.DataFrame({
+            "CustomerId": ["001", "002"],
+            "Orders_CY": [10, 20],
+            "UnknownColumn": ["A", "B"],
+        })
+
+        # Should not raise (only logs warnings)
+        validate_column_patterns(df)

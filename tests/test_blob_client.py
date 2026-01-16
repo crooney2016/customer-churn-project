@@ -575,3 +575,133 @@ class TestGetProcessingFolderBlobs:
 
         assert result == ["processing/file1.csv", "processing/file2.csv"]
         mock_list.assert_called_once_with("container")
+
+
+# =============================================================================
+# Tests for extract_snapshot_date_from_csv
+# =============================================================================
+
+def test_extract_snapshot_date_from_csv_success(_mock_config):
+    """Test extracting snapshot date from CSV with valid date."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    csv_content = (
+        "SnapshotDate,CustomerId,Orders_CY\n"
+        "2025-01-31,001,10\n"
+    ).encode("utf-8")
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result == "2025-01-31"
+
+
+def test_extract_snapshot_date_from_csv_with_brackets(_mock_config):
+    """Test extracting snapshot date from CSV with bracketed column name."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    csv_content = (
+        "[SnapshotDate],CustomerId,Orders_CY\n"
+        "2025-01-31,001,10\n"
+    ).encode("utf-8")
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result == "2025-01-31"
+
+
+def test_extract_snapshot_date_from_csv_datetime_format(_mock_config):
+    """Test extracting snapshot date from CSV with datetime format."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    csv_content = (
+        "SnapshotDate,CustomerId,Orders_CY\n"
+        "2025-01-31 12:00:00,001,10\n"
+    ).encode("utf-8")
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result == "2025-01-31"
+
+
+def test_extract_snapshot_date_from_csv_missing_column(_mock_config):
+    """Test extracting snapshot date when column is missing."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    csv_content = (
+        "CustomerId,Orders_CY\n"
+        "001,10\n"
+    ).encode("utf-8")
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result is None
+
+
+def test_extract_snapshot_date_from_csv_null_value(_mock_config):
+    """Test extracting snapshot date when value is null."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    csv_content = (
+        "SnapshotDate,CustomerId,Orders_CY\n"
+        ",001,10\n"
+    ).encode("utf-8")
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result is None
+
+
+def test_extract_snapshot_date_from_csv_invalid_date(_mock_config):
+    """Test extracting snapshot date with invalid date format."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    csv_content = (
+        "SnapshotDate,CustomerId,Orders_CY\n"
+        "invalid-date,001,10\n"
+    ).encode("utf-8")
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result is None
+
+
+def test_extract_snapshot_date_from_csv_parse_error(_mock_config):
+    """Test extracting snapshot date with malformed CSV."""
+    from function_app.blob_client import extract_snapshot_date_from_csv
+
+    # Invalid CSV content
+    csv_content = b"invalid csv content\nwith\nbroken\nformat"
+
+    result = extract_snapshot_date_from_csv(csv_content)
+    assert result is None
+
+
+# =============================================================================
+# Tests for helper functions
+# =============================================================================
+
+def test_get_container_client(_mock_config, mock_blob_service_client):
+    """Test _get_container_client returns ContainerClient."""
+    from function_app.blob_client import _get_container_client
+
+    mock_service, mock_container, _ = mock_blob_service_client
+
+    with pytest.mock.patch(
+        "function_app.blob_client._get_blob_service_client",
+        return_value=mock_service
+    ):
+        result = _get_container_client("test-container")
+        assert result == mock_container
+        mock_service.get_container_client.assert_called_once_with("test-container")
+
+
+def test_get_blob_client(_mock_config, mock_blob_service_client):
+    """Test _get_blob_client returns BlobClient."""
+    from function_app.blob_client import _get_blob_client
+
+    mock_service, _, mock_blob = mock_blob_service_client
+
+    with pytest.mock.patch(
+        "function_app.blob_client._get_blob_service_client",
+        return_value=mock_service
+    ):
+        result = _get_blob_client("test-container", "test-blob.csv")
+        assert result == mock_blob
+        mock_service.get_blob_client.assert_called_once_with(
+            container="test-container",
+            blob="test-blob.csv"
+        )
