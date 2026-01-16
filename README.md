@@ -32,7 +32,7 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-2. **Install dependencies:**
+1. **Install dependencies:**
 
    ```bash
    # Production dependencies
@@ -42,14 +42,14 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
    pip install -r requirements-dev.txt
    ```
 
-3. **Configure environment variables:**
+1. **Configure environment variables:**
 
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
-4. **Verify model files exist:**
+1. **Verify model files exist:**
    - `model/churn_model.pkl`
    - `model/model_columns.pkl`
 
@@ -57,7 +57,7 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
 
 ### Scoring Customers (Recommended: Notebook)
 
-**Use the interactive notebook for easier debugging and exploration:**
+#### Use the interactive notebook for easier debugging and exploration
 
 Open `scripts/local_scoring.ipynb` in Jupyter/VS Code:
 
@@ -75,7 +75,7 @@ The notebook handles:
 - **Analyze** and generate comprehensive business report
 - **Export** outputs for Power BI exploration
 
-**Outputs:**
+#### Outputs
 
 - `outputs/churn_scores_combined.csv` - All scored records (all snapshots)
 - `outputs/churn_scores_sql_view.csv` - **Shaped to match SQL view `dbo.vwCustomerCurrent`** (latest snapshot per customer, includes Status calculation)
@@ -92,13 +92,13 @@ If you prefer command-line execution:
 # Open scripts/local_scoring.ipynb and run the cells
 ```
 
-**Performance:**
+## Performance
 
 - 400k rows: ~2-3 minutes scoring + reasons
 - 12k rows (monthly): ~10 seconds
 - XGBoost is CPU-optimized, handles it easily
 
-**Note on SQL View Output:**
+### Note on SQL View Output
 
 The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.vwCustomerCurrent`:
 
@@ -119,7 +119,7 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    sqlcmd -S your-server -d your-database -i sql/procedures.sql
    ```
 
-2. **Verify:**
+1. **Verify:**
    - Table: `dbo.ChurnScoresHistory`
    - View: `dbo.vwCustomerCurrent`
    - Function: `dbo.fnCalculateStatus`
@@ -139,14 +139,14 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    - All variables from `.env.example`
    - Set via Azure Portal → Configuration → Application settings
 
-2. **Deploy Function App:**
+1. **Deploy Function App:**
 
    ```bash
    cd function_app
    func azure functionapp publish <your-function-app-name>
    ```
 
-3. **Verify deployment:**
+1. **Verify deployment:**
 
    ```bash
    # Test health endpoint
@@ -156,7 +156,7 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    curl -X POST https://<your-function-app>.azurewebsites.net/api/score
    ```
 
-4. **Monitor:**
+1. **Monitor:**
    - Application Insights for logs and traces
    - Function App → Monitor for execution history
    - Email notifications for success/failure
@@ -212,10 +212,10 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 ## Key Constraints
 
 1. Function outputs scores + reasons only; SQL derives Status
-2. Single History table is system of record
-3. No intermediate files or blob storage
-4. Idempotent: succeeds completely or rolls back completely
-5. Model packaged in Function, not pulled at runtime
+1. Single History table is system of record
+1. No intermediate files or blob storage
+1. Idempotent: succeeds completely or rolls back completely
+1. Model packaged in Function, not pulled at runtime
 
 ## Testing
 
@@ -235,7 +235,7 @@ pytest -m "not integration"
 pytest -m integration
 ```
 
-### Code Quality
+## Code Quality
 
 ```bash
 # Lint and format with Ruff
@@ -274,6 +274,22 @@ ruff check . && ruff format --check . && pyright function_app/
 - **Import errors in tests**: Ensure `requirements-dev.txt` is installed: `pip install -r requirements-dev.txt`
 - **Coverage below 80%**: Add more unit tests for uncovered code paths
 
+## Documentation
+
+Comprehensive operational documentation is available in `docs/`:
+
+- **[DEPLOYMENT.md](docs/DEPLOYMENT.md)** - Complete deployment runbook with step-by-step instructions and troubleshooting
+- **[CI_CD_SETUP.md](docs/CI_CD_SETUP.md)** - CI/CD pipeline setup (GitHub Actions and Azure DevOps)
+- **[APPLICATION_INSIGHTS_ALERTS.md](docs/APPLICATION_INSIGHTS_ALERTS.md)** - Application Insights alerts configuration
+- **[SERVICE_PRINCIPAL_SETUP.md](docs/SERVICE_PRINCIPAL_SETUP.md)** - Service Principal configuration guide
+- **[GIT_REMOTES_SETUP.md](docs/GIT_REMOTES_SETUP.md)** - Dual remote setup (GitHub + Azure DevOps)
+- **[COST_MONITORING.md](docs/COST_MONITORING.md)** - Cost monitoring and optimization guide
+- **[STREAMLIT_DASHBOARD_ASSESSMENT.md](docs/STREAMLIT_DASHBOARD_ASSESSMENT.md)** - Streamlit dashboard feasibility assessment
+
+For code review findings:
+
+- **[outputs/code-review.md](outputs/code-review.md)** - Latest code review summary and production readiness assessment
+
 ## Support
 
 For issues or questions, check:
@@ -281,3 +297,4 @@ For issues or questions, check:
 - Application Insights logs (Function App)
 - SQL error logs
 - Email notifications for pipeline failures
+- **Documentation** (see Documentation section above) - Comprehensive guides for deployment, troubleshooting, and operations

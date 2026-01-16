@@ -1,7 +1,7 @@
 # Streamlit Dashboard Assessment
 
-**Project:** Century Churn Prediction System  
-**Last Updated:** 2024-12-19  
+**Project:** Century Churn Prediction System
+**Last Updated:** 2024-12-19
 **Version:** 1.0
 
 ## Overview
@@ -22,18 +22,18 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 ### Existing Tools
 
-1. **Power BI:** 
+1. **Power BI:**
    - Primary visualization and reporting tool
    - Business user-friendly interface
    - Integrated with Azure SQL Database
    - Provides trend analysis and aggregations
 
-2. **Application Insights:**
+1. **Application Insights:**
    - Technical monitoring and logging
    - Query-based dashboards available
    - Developer-oriented interface
 
-3. **Email Notifications:**
+1. **Email Notifications:**
    - Success/failure notifications
    - Risk distribution summaries
    - Pipeline execution metrics
@@ -44,14 +44,12 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 **Purpose:** Document model performance, feature importance, and training statistics
 
-**Content:**
 - Model performance metrics (accuracy, precision, recall, ROC-AUC)
 - Feature importance visualization (bar charts, waterfall charts)
 - Training data statistics (data quality, distributions)
 - Model version tracking (when model is retrained)
 - Model metadata (training date, version, hyperparameters)
 
-**Value:**
 - ✅ Useful for ML team and data scientists
 - ✅ Helps document model decisions
 - ✅ Useful for model governance and compliance
@@ -59,7 +57,6 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 **Effort:** Medium (2-3 days development)
 
-**Dependencies:**
 - Model metadata files (may need to be created)
 - Training metrics (may need to be exported from training notebook)
 
@@ -67,14 +64,12 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 **Purpose:** Interactive exploration of scoring results and customer data
 
-**Content:**
 - Sample scoring results visualization (interactive table)
 - Risk distribution charts (pie charts, bar charts)
 - Customer segmentation analysis (filterable by segment, risk band)
 - Trend analysis over time (line charts)
 - Customer drill-down (view individual customer details)
 
-**Value:**
 - ✅ Useful for business analysts and non-technical stakeholders
 - ✅ Interactive exploration without SQL knowledge
 - ⚠️ May duplicate Power BI capabilities
@@ -82,7 +77,6 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 **Effort:** Medium-High (3-5 days development)
 
-**Dependencies:**
 - Database connection or API endpoint
 - Streamlit deployment (container or Azure App Service)
 
@@ -90,14 +84,12 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 **Purpose:** Real-time monitoring of pipeline execution and model performance
 
-**Content:**
 - Pipeline execution history (timeline, status, duration)
 - Performance metrics over time (execution time, row counts)
 - Error rate tracking (error rate trends, error types)
 - Cost monitoring (Azure Consumption plan usage, cost per execution)
 - Data quality metrics (row counts, risk distribution changes)
 
-**Value:**
 - ✅ Useful for operations team
 - ✅ Complements Application Insights (more user-friendly)
 - ✅ Helps track costs and performance trends
@@ -106,7 +98,6 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 **Effort:** High (5-7 days development)
 
-**Dependencies:**
 - Application Insights API access
 - Azure Cost Management API (for cost data)
 - Database access for historical metrics
@@ -120,17 +111,17 @@ This document assesses the feasibility and value of implementing a Streamlit das
    - Python-based (matches existing codebase)
    - Good integration with pandas DataFrames
 
-2. **Good for Non-Technical Users:**
+1. **Good for Non-Technical Users:**
    - Intuitive interface
    - No SQL knowledge required
    - Interactive widgets (filters, sliders, dropdowns)
 
-3. **Flexible:**
+1. **Flexible:**
    - Can combine multiple data sources
    - Easy to add new visualizations
    - Can embed external content (charts, iframes)
 
-4. **Independent:**
+1. **Independent:**
    - Separate from Power BI (different use case)
    - Doesn't affect core Azure Function code
    - Can be deployed independently
@@ -142,17 +133,17 @@ This document assesses the feasibility and value of implementing a Streamlit das
    - Requires separate deployment/container
    - Additional maintenance overhead
 
-2. **May Duplicate Functionality:**
+1. **May Duplicate Functionality:**
    - Power BI already provides visualization
    - Application Insights provides monitoring
    - Email notifications provide alerts
 
-3. **Not Necessary for Core Functionality:**
+1. **Not Necessary for Core Functionality:**
    - Core pipeline works without it
    - Documentation can be in markdown/docs
    - Monitoring exists in Application Insights
 
-4. **Deployment Complexity:**
+1. **Deployment Complexity:**
    - Requires container or Azure App Service
    - Needs database/API access
    - Additional authentication considerations
@@ -161,8 +152,9 @@ This document assesses the feasibility and value of implementing a Streamlit das
 
 ### Option 1: Separate Streamlit App (Recommended)
 
-**Structure:**
-```
+#### Structure
+
+```text
 century-churn-prediction-project/
 ├── dashboard/              # New directory
 │   ├── app.py             # Main Streamlit app
@@ -176,31 +168,35 @@ century-churn-prediction-project/
 └── ...
 ```
 
-**Deployment:**
 - Azure Container Instances (ACI) or Azure App Service
 - Docker container with Streamlit
 - Environment variables for database connection
 
-**Pros:**
+#### Pros (Option 1: Separate Streamlit App (Recommended))
+
 - Clean separation from core code
 - Independent deployment
 - Easy to disable if not needed
 
-**Cons:**
+#### Cons (Option 1: Separate Streamlit App (Recommended))
+
 - Additional infrastructure
 - Separate deployment pipeline
 
 ### Option 2: Integrated into Function App (Not Recommended)
 
-**Structure:**
+#### Structure (Option 2: Integrated into Function App (Not Recommended))
+
 - Add Streamlit app as separate endpoint in Function App
 - Use HTTP trigger to serve Streamlit app
 
-**Pros:**
+#### Pros (Option 2: Integrated into Function App (Not Recommended))
+
 - Single deployment
 - Shared infrastructure
 
-**Cons:**
+#### Cons (Option 2: Integrated into Function App (Not Recommended))
+
 - Not suitable for Function App architecture
 - Conflicts with Function App runtime
 - Not recommended by Azure Functions best practices
@@ -209,59 +205,67 @@ century-churn-prediction-project/
 
 ### Phase 1: Model Documentation Dashboard (MVP)
 
-**Scope:**
+#### Scope
+
 - Model performance metrics (from training notebook exports)
 - Feature importance visualization
 - Training data statistics
 - Model version tracking
 
-**Timeline:** 2-3 days  
-**Effort:** Medium  
+**Timeline:** 2-3 days
+**Effort:** Medium
 **Value:** High (for ML team)
 
-**Files to Create:**
+#### Files to Create
+
 - `dashboard/app.py` - Main app entry point
 - `dashboard/pages/model_docs.py` - Model documentation page
 - `dashboard/components/metrics.py` - Metrics visualization components
 
-**Data Sources:**
+#### Data Sources
+
 - Model metadata JSON files (create during training)
 - Feature importance CSV (export from training notebook)
 
 ### Phase 2: Data Exploration Dashboard (Optional)
 
-**Scope:**
+#### Scope (Phase 2: Data Exploration Dashboard (Optional))
+
 - Interactive scoring results table
 - Risk distribution charts
 - Customer segmentation filters
 - Trend analysis
 
-**Timeline:** 3-5 days  
-**Effort:** Medium-High  
+**Timeline:** 3-5 days
+**Effort:** Medium-High
 **Value:** Medium (may duplicate Power BI)
 
-**Files to Create:**
+#### Files to Create (Phase 2: Data Exploration Dashboard (Optional))
+
 - `dashboard/pages/exploration.py` - Data exploration page
 - `dashboard/components/charts.py` - Chart components
 - `dashboard/utils/db.py` - Database connection utilities
 
-**Data Sources:**
+#### Data Sources (Phase 2: Data Exploration Dashboard (Optional))
+
 - Azure SQL Database (read-only access)
 - SQL views: `dbo.vwCustomerCurrent`
 
 ### Phase 3: Monitoring Dashboard (Future)
 
-**Scope:**
+#### Scope (Phase 3: Monitoring Dashboard (Future))
+
 - Pipeline execution history
 - Performance metrics over time
 - Cost monitoring
 - Data quality metrics
 
-**Timeline:** 5-7 days  
-**Effort:** High  
+**Timeline:** 5-7 days
+**Effort:** High
 **Value:** Medium (Application Insights exists)
 
-**Data Sources:**
+#### Data Sources (Phase 3: Monitoring Dashboard (Future))
+
 - Application Insights API
 - Azure Cost Management API
 - SQL Database (historical metrics)
@@ -284,7 +288,7 @@ Instead of Streamlit dashboard, enhance documentation:
 - Include training statistics in markdown
 - Create visualizations as static images (exported from training notebook)
 
-**Pros:** No additional infrastructure, easier to maintain  
+**Pros:** No additional infrastructure, easier to maintain
 **Cons:** Less interactive, requires manual updates
 
 ### 2. Power BI Enhancements
@@ -295,7 +299,7 @@ Enhance existing Power BI dashboard:
 - Add monitoring metrics report
 - Improve data exploration features
 
-**Pros:** Uses existing infrastructure, familiar to users  
+**Pros:** Uses existing infrastructure, familiar to users
 **Cons:** May not support all visualization needs, less flexible
 
 ### 3. Application Insights Workbooks
@@ -306,7 +310,7 @@ Use Application Insights Workbooks for monitoring:
 - Add KQL queries for metrics
 - Customize dashboards
 
-**Pros:** Integrated with Application Insights, no additional infrastructure  
+**Pros:** Integrated with Application Insights, no additional infrastructure
 **Cons:** Requires KQL knowledge, less user-friendly for non-technical users
 
 ## Recommendations
@@ -318,12 +322,12 @@ Use Application Insights Workbooks for monitoring:
    - Document what Application Insights provides
    - Identify gaps
 
-2. **Stakeholder Feedback:**
+1. **Stakeholder Feedback:**
    - Survey business users on Power BI limitations
    - Survey ML team on model documentation needs
    - Survey operations team on monitoring needs
 
-3. **Decision:**
+1. **Decision:**
    - If gaps identified: Consider Phase 1 (Model Documentation)
    - If Power BI sufficient: Defer Streamlit implementation
    - If monitoring needs: Consider Application Insights Workbooks first
@@ -335,12 +339,12 @@ Use Application Insights Workbooks for monitoring:
    - Useful for ML team
    - Can be deployed independently
 
-2. **Evaluate Before Phase 2:**
+1. **Evaluate Before Phase 2:**
    - Get user feedback on Phase 1
    - Assess if Phase 2 adds value beyond Power BI
    - Consider alternatives
 
-3. **Defer Phase 3:**
+1. **Defer Phase 3:**
    - Application Insights provides monitoring
    - Cost monitoring can be done in Azure Portal
    - Only proceed if clear value identified
@@ -379,16 +383,12 @@ elif page == "Training Statistics":
     # Display training data stats
 ```
 
-### Dependencies
-
 ```text
 # dashboard/requirements.txt
 streamlit>=1.28.0
 pandas>=2.0.0
 plotly>=5.17.0
 ```
-
-### Deployment (Docker)
 
 ```dockerfile
 # dashboard/Dockerfile
@@ -410,8 +410,8 @@ CMD ["streamlit", "run", "app.py", "--server.port=8501", "--server.address=0.0.0
 Streamlit dashboard is a **valuable but optional enhancement**. Priority should be:
 
 1. ✅ **Phase 1 (Model Documentation):** High value, recommended if ML team needs better documentation
-2. ⚠️ **Phase 2 (Data Exploration):** Medium value, consider if Power BI limitations identified
-3. ❌ **Phase 3 (Monitoring):** Low priority, Application Insights provides sufficient monitoring
+1. ⚠️ **Phase 2 (Data Exploration):** Medium value, consider if Power BI limitations identified
+1. ❌ **Phase 3 (Monitoring):** Low priority, Application Insights provides sufficient monitoring
 
 **Final Recommendation:** Start with Phase 1 if there's a clear need for model documentation beyond what's in the training notebook. Evaluate Phase 2 based on user feedback and Power BI limitations. Defer Phase 3 unless clear value is identified.
 

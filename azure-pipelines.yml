@@ -1,0 +1,149 @@
+# Azure DevOps Pipeline for Century Churn Prediction System
+# Triggers on push to main branch and pull requests
+
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - function_app/**
+      - tests/**
+      - requirements*.txt
+      - azure-pipelines.yml
+
+pr:
+  branches:
+    include:
+      - main
+      - develop
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  pythonVersion: '3.11'
+
+stages:
+  - stage: Test
+    displayName: 'Run Tests and Linting'
+    jobs:
+      - job: Test
+        displayName: 'Run Tests'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install -r requirements-dev.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              pytest --cov=function_app --cov-report=xml --cov-report=term-missing -v
+            displayName: 'Run tests'
+
+          - task: PublishCodeCoverageResults@1
+            inputs:
+              codeCoverageTool: 'Cobertura'
+              summaryFileLocation: '$(System.DefaultWorkingDirectory)/**/coverage.xml'
+              reportDirectory: '$(System.DefaultWorkingDirectory)/**/htmlcov'
+            displayName: 'Publish coverage results'
+            continueOnError: true
+
+      - job: Lint
+        displayName: 'Lint Code'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install -r requirements-dev.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              pylint function_app/ --fail-under=8.0 || true
+            displayName: 'Run pylint'
+            continueOnError: true
+
+          - script: |
+              pyright function_app/
+            displayName: 'Run pyright'
+            continueOnError: true
+
+          - script: |
+              ruff check . || true
+            displayName: 'Run ruff check'
+            continueOnError: true
+
+          - script: |
+              ruff format --check . || true
+            displayName: 'Run ruff format check'
+            continueOnError: true
+
+      - job: TypeCheck
+        displayName: 'Type Check'
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '$(pythonVersion)'
+            displayName: 'Use Python $(pythonVersion)'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              pip install -r requirements-dev.txt
+            displayName: 'Install dependencies'
+
+          - script: |
+              pyright function_app/
+            displayName: 'Run pyright'
+
+  - stage: Deploy
+    displayName: 'Deploy to Azure Function App'
+    dependsOn: Test
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - deployment: DeployFunctionApp
+        displayName: 'Deploy Function App'
+        environment: 'production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: UsePythonVersion@0
+                  inputs:
+                    versionSpec: '$(pythonVersion)'
+                  displayName: 'Use Python $(pythonVersion)'
+
+                - script: |
+                    python -m pip install --upgrade pip
+                    pip install -r requirements.txt
+                    pip install -r $(System.DefaultWorkingDirectory)/function_app/requirements.txt
+                  displayName: 'Install dependencies'
+
+                - script: |
+                    pytest --cov=function_app --cov-report=term-missing -v || true
+                  displayName: 'Run tests (pre-deployment)'
+                  continueOnError: true
+
+                - task: AzureFunctionApp@1
+                  inputs:
+                    azureSubscription: '$(AZURE_SERVICE_CONNECTION)'
+                    appType: 'functionApp'
+                    appName: '$(AZURE_FUNCTIONAPP_NAME)'
+                    package: '$(System.DefaultWorkingDirectory)/function_app'
+                    deploymentMethod: 'auto'
+                  displayName: 'Deploy to Azure Function App'
+
+                - script: |
+                    echo "Deployment completed. Verify Function App status in Azure Portal."
+                  displayName: 'Post-deployment verification'

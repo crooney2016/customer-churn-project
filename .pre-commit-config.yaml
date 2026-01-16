@@ -1,0 +1,26 @@
+# Pre-commit hooks configuration
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  # Auto-fix markdown linting errors
+  - repo: local
+    hooks:
+      - id: fix-markdown-lint
+        name: Fix markdown linting errors
+        entry: python3 scripts/fix-markdown-lint.py
+        language: system
+        files: \.md$
+        pass_filenames: false
+        args: ['.']
+        # Auto-stage fixed files
+        stages: [commit]
+
+  # Optional: Run markdownlint to check for unfixable errors
+  # Uncomment if you want to fail commit on unfixable errors
+  # - repo: https://github.com/igorshubovych/markdownlint-cli
+  #   rev: v0.38.0
+  #   hooks:
+  #     - id: markdownlint
+  #       args: ['--fix']  # Auto-fix what it can
+  #       # Remove --fix to fail on errors instead

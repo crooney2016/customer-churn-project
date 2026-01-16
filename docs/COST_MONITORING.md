@@ -1,7 +1,7 @@
 # Cost Monitoring Guide
 
-**Project:** Century Churn Prediction System  
-**Last Updated:** 2024-12-19  
+**Project:** Century Churn Prediction System
+**Last Updated:** 2024-12-19
 **Version:** 1.0
 
 ## Overview
@@ -17,12 +17,12 @@ This document provides instructions for monitoring and optimizing Azure Consumpt
    - Based on memory allocation and execution duration
    - Formula: `(Memory in GB) × (Execution Time in Seconds) × (Price per GB-second)`
 
-2. **Function Executions:**
+1. **Function Executions:**
    - First 1 million executions free per month
    - Additional executions: $0.20 per million
    - Typically not a concern for monthly jobs
 
-3. **Application Insights:**
+1. **Application Insights:**
    - First 5 GB free per month
    - Additional data: ~$2.30 per GB
    - Can be significant with verbose logging
@@ -33,19 +33,19 @@ This document provides instructions for monitoring and optimizing Azure Consumpt
 
 1. **Azure Portal → Cost Management + Billing → Cost analysis**
 
-2. **Filter by Resource:**
+1. **Filter by Resource:**
    - Resource type: Function App
    - Resource: `<your-function-app-name>`
    - Time range: Last 30 days / Last 7 days
 
-3. **View Metrics:**
+1. **View Metrics:**
    - Total cost
    - Cost by date
    - Cost breakdown by resource
 
 ### Method 2: Application Insights Metrics
 
-**Query Execution Metrics:**
+#### Query Execution Metrics
 
 ```kusto
 requests
@@ -64,7 +64,7 @@ requests
     estimated_cost_usd = total_gb_seconds * 0.000016  // Approximate price
 ```
 
-**Query Function App Usage:**
+#### Query Function App Usage
 
 ```kusto
 // Function App execution time
@@ -83,7 +83,7 @@ requests
 
 ### Method 3: Cost Management API (Automated)
 
-**Create Cost Monitoring Script:**
+#### Create Cost Monitoring Script
 
 ```python
 # scripts/monitor_costs.py
@@ -124,23 +124,26 @@ for row in result.rows:
 
 ### 1. Optimize Execution Time
 
-**Current Performance:**
+#### Current Performance
+
 - 12k rows (monthly): ~10 seconds
 - 400k rows (full): ~2-3 minutes
 
-**Optimizations Applied:**
+#### Optimizations Applied
+
 - ✅ `itertuples()` instead of `iterrows()` (50-70% faster)
 - ✅ Vectorized `RiskBand` calculation (20-30% faster)
 - ✅ Model caching with `@lru_cache` (avoids 1-2 seconds per invocation)
 - ✅ Single `pd.concat()` operation (~5% faster)
 
-**Monitoring:**
+#### Monitoring
+
 - Track execution duration in Application Insights
 - Alert if duration increases significantly
 
 ### 2. Optimize Memory Usage
 
-**Monitor Memory:**
+#### Monitor Memory
 
 ```kusto
 // Memory usage per execution
@@ -152,24 +155,27 @@ requests
     max_memory_mb = max(memory_mb)
 ```
 
-**Optimization:**
+#### Optimization
+
 - Process data in batches (already implemented)
 - Minimize DataFrame copies
 - Release large objects when done
 
 ### 3. Optimize Logging (Application Insights Cost)
 
-**Current Logging:**
+#### Current Logging
+
 - INFO level: Pipeline steps, metrics
 - ERROR level: Exceptions with stack traces
 - DEBUG level: Disabled in production
 
-**Optimization:**
+#### Optimization (3. Optimize Logging (Application Insights Cost))
+
 - Reduce verbose logging
 - Use sampling (configured in `host.json`)
 - Archive old logs (set retention policy)
 
-**Application Insights Sampling:**
+#### Application Insights Sampling
 
 ```json
 // host.json
@@ -187,11 +193,13 @@ requests
 
 ### 4. Schedule Optimization
 
-**Current Schedule:**
+#### Current Schedule
+
 - Monthly timer trigger (1st of month at 6 AM UTC)
 - ~12 executions per year
 
-**Considerations:**
+#### Considerations
+
 - Schedule is already optimal (monthly batch job)
 - No need to run more frequently
 
@@ -201,23 +209,23 @@ requests
 
 1. **Azure Portal → Cost Management + Billing → Budgets → Create budget**
 
-2. **Budget Configuration:**
+1. **Budget Configuration:**
    - Scope: Subscription or Resource Group
    - Budget amount: Set monthly budget (e.g., $50)
    - Period: Monthly
    - Reset type: Monthly
 
-3. **Alert Conditions:**
+1. **Alert Conditions:**
    - Alert threshold: 50%, 75%, 90%, 100%
    - Alert recipients: Operations team email
 
-4. **Action Groups:**
+1. **Action Groups:**
    - Create action group with email notifications
    - Add recipients
 
 ### Cost Monitoring Query (Application Insights)
 
-**Create Custom Query:**
+#### Create Custom Query
 
 ```kusto
 // Estimated cost per execution
@@ -244,7 +252,7 @@ requests
 
 ### Monthly Cost Summary
 
-**Create Dashboard Query:**
+#### Create Dashboard Query
 
 ```kusto
 // Monthly cost summary
@@ -270,7 +278,7 @@ requests
 
 ### Cost by Function
 
-**If multiple functions exist:**
+#### If multiple functions exist
 
 ```kusto
 requests
@@ -295,7 +303,8 @@ requests
 
 ### Monthly Estimate
 
-**For 12k rows (monthly batch):**
+#### For 12k rows (monthly batch)
+
 - Execution time: ~10 seconds
 - Memory: ~1 GB (approximate)
 - GB-seconds: 10 GB-seconds
@@ -303,11 +312,12 @@ requests
 - Function executions: 1 execution (free tier covers)
 - **Estimated monthly cost: < $0.10**
 
-**Additional Costs:**
+#### Additional Costs
+
 - Application Insights: ~$1-2/month (depends on logging volume)
 - Storage (if any): Minimal
 
-**Total Estimated Monthly Cost: < $3**
+#### Total Estimated Monthly Cost: < $3
 
 ### Annual Estimate
 

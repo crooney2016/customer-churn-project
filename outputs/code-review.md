@@ -1,7 +1,7 @@
 # Code Review Summary - Century Churn Prediction Project
 
-**Date:** 2024-12-19  
-**Reviewer:** Automated Code Review  
+**Date:** 2024-12-19
+**Reviewer:** Automated Code Review
 **Scope:** Complete code review of `function_app/` components
 
 ## Executive Summary
@@ -12,21 +12,21 @@ The codebase is in **excellent condition** for production deployment. All critic
 
 ## Component Status
 
-| Component         | Status      | Critical Issues | Minor Issues | Notes                                                                      |
+| Component | Status | Critical Issues | Minor Issues | Notes |
 | ----------------- | ----------- | --------------- | ------------ | -------------------------------------------------------------------------- |
-| `config.py`       | Excellent   | 0               | 0            | Pydantic Settings, validation, .env loading                                |
-| `dax_client.py`   | Excellent   | 0               | 0            | Retry logic, rate limiting, pagination support                             |
-| `scorer.py`       | Excellent   | 0               | 1            | Vectorized operations, cached model loading                                |
-| `sql_client.py`   | Excellent   | 0               | 0            | Batch processing, transactions, itertuples                                 |
-| `pbi_client.py`   | Good        | 0               | 0            | Retry logic, refresh monitoring                                            |
-| `email_client.py` | Good        | 0               | 0            | Retry logic, HTML templates                                                |
-| `function_app.py` | Excellent   | 0               | 0            | Clear pipeline orchestration, step tracking                                |
+| `config.py` | Excellent | 0 | 0 | Pydantic Settings, validation, .env loading |
+| `dax_client.py` | Excellent | 0 | 0 | Retry logic, rate limiting, pagination support |
+| `scorer.py` | Excellent | 0 | 1 | Vectorized operations, cached model loading |
+| `sql_client.py` | Excellent | 0 | 0 | Batch processing, transactions, itertuples |
+| `pbi_client.py` | Good | 0 | 0 | Retry logic, refresh monitoring |
+| `email_client.py` | Good | 0 | 0 | Retry logic, HTML templates |
+| `function_app.py` | Excellent | 0 | 0 | Clear pipeline orchestration, step tracking |
 
 ## Performance Analysis
 
 ### Critical Issues: None
 
-**Key Findings:**
+#### Key Findings
 
 - ✅ No `iterrows()` usage detected anywhere in codebase
 - ✅ `RiskBand` calculation vectorized with `pd.cut()` (scorer.py:305-312)
@@ -36,14 +36,15 @@ The codebase is in **excellent condition** for production deployment. All critic
 
 ### Minor Optimization Opportunity
 
-| File        | Line | Issue                 | Severity | Current Pattern                                    | Recommended Fix                    | Est. CPU Reduction | Est. Cost Impact |
+| File | Line | Issue | Severity | Current Pattern | Recommended Fix | Est. CPU Reduction | Est. Cost Impact |
 | ----------- | ---- | --------------------- | -------- | -------------------------------------------------- | ---------------------------------- | ------------------ | ---------------- |
-| `scorer.py` | 290  | `for i in range(len)` | Moderate | `for i in range(len(contrib_df)): df.iloc[i]`      | Use `itertuples()` with refactor   | 15-25%             | Low              |
+| `scorer.py` | 290 | `for i in range(len)` | Moderate | `for i in range(len(contrib_df)): df.iloc[i]` | Use `itertuples()` with refactor | 15-25% | Low |
 
-**Details:**
+#### Details
 
 - **Location:** `scorer.py:290-293`
 - **Current Implementation:**
+
   ```python
   reasons_rows = [
       top_reasons(contrib_df.iloc[i], float(probs[i]), n=3)
@@ -71,7 +72,7 @@ The codebase is in **excellent condition** for production deployment. All critic
 
 ### Linter Results
 
-**Pylint:** No errors found  
+**Pylint:** No errors found
 **Pyright:** No errors found
 
 ## Architecture Review
@@ -82,16 +83,16 @@ The codebase is in **excellent condition** for production deployment. All critic
    - DAX client, scoring, SQL, Power BI, and email clients are well-separated
    - Each module has a single responsibility
 
-2. **Idempotent operations**
+1. **Idempotent operations**
    - All operations are designed to be idempotent
    - SQL writes wrapped in transactions with proper rollback
 
-3. **Comprehensive error handling**
+1. **Comprehensive error handling**
    - Retry logic using tenacity for transient errors
    - Proper exception handling with context
    - Logging to Application Insights
 
-4. **Proper secret management**
+1. **Proper secret management**
    - No hardcoded secrets
    - Environment variable configuration via Pydantic Settings
    - Secret masking in logs
@@ -107,7 +108,7 @@ The codebase is in **excellent condition** for production deployment. All critic
 - Loads `.env` file from project root via python-dotenv
 - Provides helpful error messages for missing configuration
 
-**Compliance:**
+
 - ✅ Follows python.md rules for configuration
 - ✅ Type hints on all fields
 - ✅ Docstrings present
@@ -122,13 +123,13 @@ The codebase is in **excellent condition** for production deployment. All critic
 - Validates DAX query output schema (77 columns expected)
 - Normalizes column names (removes brackets per dax.md)
 
-**Compliance:**
+
 - ✅ Follows error-handling.md patterns (retry logic)
 - ✅ Follows logging.md patterns (step tracking)
 - ✅ Follows dax.md rules (column validation)
 - ✅ Type hints and docstrings present
 
-**Key Features:**
+
 - Custom wait function for 429 rate limiting
 - Exponential backoff for retries
 - Pagination support for datasets > 100k rows
@@ -143,12 +144,13 @@ The codebase is in **excellent condition** for production deployment. All critic
 - Excel date conversion handling
 - Feature contribution analysis for reasons generation
 
-**Compliance:**
+
 - ✅ Follows python.md performance best practices
 - ✅ Type hints and docstrings present
 - ⚠️ Minor: reasons loop uses `iloc` (acceptable for current use case)
 
-**Performance Optimizations Applied:**
+#### Performance Optimizations Applied
+
 - `@lru_cache` on `load_model()` - avoids reloading model on each invocation
 - Vectorized `RiskBand` calculation - replaced `apply()` with `pd.cut()`
 - Single `pd.concat()` - combined multiple concat operations
@@ -163,13 +165,13 @@ The codebase is in **excellent condition** for production deployment. All critic
 - Type-safe parameter conversion
 - Logging with step tracking
 
-**Compliance:**
+
 - ✅ Follows error-handling.md patterns (transactions, rollback)
 - ✅ Follows logging.md patterns (step tracking, performance metrics)
 - ✅ Follows python.md performance best practices (`itertuples()`)
 - ✅ Type hints and docstrings present
 
-**Key Features:**
+
 - Batch processing for large datasets
 - Safe type conversion for dates, floats, strings
 - Proper error handling with transaction rollback
@@ -182,7 +184,7 @@ The codebase is in **excellent condition** for production deployment. All critic
 - Refresh monitoring with timeout
 - Proper error handling
 
-**Compliance:**
+
 - ✅ Follows error-handling.md patterns (retry logic)
 - ✅ Type hints and docstrings present
 
@@ -194,7 +196,7 @@ The codebase is in **excellent condition** for production deployment. All critic
 - HTML email templates
 - Success and failure email formatting
 
-**Compliance:**
+
 - ✅ Follows error-handling.md patterns (retry logic)
 - ✅ Type hints and docstrings present
 
@@ -207,7 +209,7 @@ The codebase is in **excellent condition** for production deployment. All critic
 - Metrics collection (duration, row counts, risk distribution)
 - Email notifications on success/failure
 
-**Compliance:**
+
 - ✅ Follows logging.md patterns (step tracking, metrics)
 - ✅ Follows error-handling.md patterns (error context, email alerts)
 - ✅ Type hints and docstrings present
@@ -278,7 +280,8 @@ None found.
 
 ## Estimated CPU/Cost Impact
 
-**Current Optimizations Applied:**
+### Current Optimizations Applied
+
 - `itertuples()` vs `iterrows()`: ~50-70% CPU reduction
 - Vectorized `RiskBand` calculation: ~20-30% CPU reduction
 - Single `pd.concat()` operation: ~5% CPU reduction
@@ -286,17 +289,20 @@ None found.
 
 **Total Estimated Savings:** Significant CPU reduction compared to unoptimized version. Azure Consumption plan costs are optimized through these performance improvements.
 
-**Remaining Opportunity:**
+#### Remaining Opportunity
+
 - Optimize reasons loop: ~15-25% additional CPU reduction (optional, complexity high)
 
 ## Testing Status
 
-**Current Test Coverage:**
+### Current Test Coverage
+
 - Unit tests exist for all major modules
 - Integration tests marked but skipped (require external dependencies)
 - Test fixtures defined in `conftest.py`
 
-**Recommendations:**
+#### Recommendations
+
 - Review test coverage percentage (aim for 80%+)
 - Add more integration tests when external dependencies are available
 - Mock external services in unit tests (already done)
@@ -310,9 +316,9 @@ The codebase is production-ready. No critical issues require immediate attention
 ### Future Enhancements (Optional)
 
 1. **Performance:** Consider optimizing reasons generation loop if profiling shows it as a bottleneck
-2. **Testing:** Expand test coverage to 80%+
-3. **Monitoring:** Set up Application Insights alerts for proactive monitoring
-4. **Documentation:** Create deployment runbook for operations team
+1. **Testing:** Expand test coverage to 80%+
+1. **Monitoring:** Set up Application Insights alerts for proactive monitoring
+1. **Documentation:** Create deployment runbook for operations team
 
 ## Conclusion
 
@@ -322,5 +328,5 @@ The codebase demonstrates **excellent code quality** and **production readiness*
 
 ---
 
-**Review Completed:** 2024-12-19  
+**Review Completed:** 2024-12-19
 **Next Review:** After deployment or significant changes

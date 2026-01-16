@@ -79,6 +79,41 @@ jobs:
         run: |
           ruff format --check . || true
 
+  markdown-lint:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install markdownlint (optional check)
+        run: |
+          npm install -g markdownlint-cli2 || echo "markdownlint-cli2 not available, skipping"
+
+      - name: Run markdown fix script (dry-run)
+        run: |
+          python3 scripts/fix-markdown-lint.py --dry-run . || true
+
+      - name: Check for markdown errors
+        run: |
+          # Run fix script and check if any files would be modified
+          python3 scripts/fix-markdown-lint.py --dry-run . > /tmp/markdown-fix-output.txt 2>&1 || true
+          
+          # Check if script would fix any files
+          if grep -q "Would fix:" /tmp/markdown-fix-output.txt; then
+            echo "❌ Markdown linting errors found. Run 'python3 scripts/fix-markdown-lint.py .' to fix."
+            cat /tmp/markdown-fix-output.txt
+            exit 1
+          else
+            echo "✅ All markdown files are lint-free"
+          fi
+
   type-check:
     name: Type Check
     runs-on: ubuntu-latest

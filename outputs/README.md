@@ -32,20 +32,20 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-2. **Install dependencies:**
+1. **Install dependencies:**
 
    ```bash
    pip install -r requirements.txt
    ```
 
-3. **Configure environment variables:**
+1. **Configure environment variables:**
 
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
    ```
 
-4. **Verify model files exist:**
+1. **Verify model files exist:**
    - `model/churn_model.pkl`
    - `model/model_columns.pkl`
 
@@ -57,7 +57,7 @@ Score CSV files locally using the interactive notebook:
 
 ```bash
 # Open and run scripts/local_scoring.ipynb
-# The notebook provides a complete workflow for:
+# The notebook provides a complete workflow for
 # - Loading CSV files (single file or directory)
 # - Scoring customers with churn predictions
 # - Shaping data to match SQL view structure
@@ -72,7 +72,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
 - Reason_1, Reason_2, Reason_3 (human-readable explanations)
 - ScoredAt timestamp
 
-**Performance:**
+## Performance
 
 - 400k rows: ~2-3 minutes scoring + reasons
 - 12k rows (monthly): ~10 seconds
@@ -90,7 +90,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
    sqlcmd -S your-server -d your-database -i sql/procedures.sql
    ```
 
-2. **Verify:**
+1. **Verify:**
    - Table: `dbo.ChurnScoresHistory`
    - View: `dbo.vwCustomerCurrent`
    - Function: `dbo.fnCalculateStatus`
@@ -110,14 +110,14 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
    - All variables from `.env.example`
    - Set via Azure Portal → Configuration → Application settings
 
-2. **Deploy Function App:**
+1. **Deploy Function App:**
 
    ```bash
    cd function_app
    func azure functionapp publish <your-function-app-name>
    ```
 
-3. **Verify deployment:**
+1. **Verify deployment:**
 
    ```bash
    # Test health endpoint
@@ -127,7 +127,7 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
    curl -X POST https://<your-function-app>.azurewebsites.net/api/score
    ```
 
-4. **Monitor:**
+1. **Monitor:**
    - Application Insights for logs and traces
    - Function App → Monitor for execution history
    - Email notifications for success/failure
@@ -172,10 +172,10 @@ Outputs to `outputs/churn_scores_combined.csv` and `outputs/churn_scores_sql_vie
 ## Key Constraints
 
 1. Function outputs scores + reasons only; SQL derives Status
-2. Single History table is system of record
-3. No intermediate files or blob storage
-4. Idempotent: succeeds completely or rolls back completely
-5. Model packaged in Function, not pulled at runtime
+1. Single History table is system of record
+1. No intermediate files or blob storage
+1. Idempotent: succeeds completely or rolls back completely
+1. Model packaged in Function, not pulled at runtime
 
 ## Troubleshooting
 
