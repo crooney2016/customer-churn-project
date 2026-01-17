@@ -65,6 +65,8 @@ def _parse_connection_string(connection_string: str) -> dict:
 
     Expected format: Server=hostname;Port=1433;Database=dbname;UID=username;PWD=password;
     """
+    if not connection_string:
+        raise ValueError("Connection string cannot be None or empty")
     params = {}
     for part in connection_string.split(';'):
         part = part.strip()
@@ -150,8 +152,12 @@ def verify_permissions(conn: pymssql.Connection, username: str) -> None:
     Since db_owner role grants all database permissions, we only need to verify
     that the role assignment was successful, not test each individual permission.
     We do a simple DDL test to confirm permissions are working.
+
+    Args:
+        conn: Database connection
+        username: Username that was granted db_owner role (for logging)
     """
-    logger.info("Verifying database permissions...")
+    logger.info("Verifying database permissions for user: %s", username)
     cursor = conn.cursor()
 
     try:
@@ -164,9 +170,9 @@ def verify_permissions(conn: pymssql.Connection, username: str) -> None:
             DROP TABLE dbo.PermissionTest_DDL;
         """)
         conn.commit()
-        logger.info("  ✓ Permissions verified (db_owner role confirmed)")
+        logger.info("  ✓ Permissions verified (db_owner role confirmed for %s)", username)
     except pymssql.Error as e:
-        logger.error("  ✗ Permission verification failed: %s", str(e))
+        logger.error("  ✗ Permission verification failed for %s: %s", username, str(e))
         raise RuntimeError(f"Permission verification failed: {str(e)}") from e
 
 

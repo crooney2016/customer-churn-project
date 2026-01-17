@@ -50,6 +50,7 @@ DAX Query → Python (score + reasons) → SQL History Table → SQL Views → P
    ```
 
 1. **Verify model files exist:**
+
 - `model/churn_model.pkl`
 - `model/model_columns.pkl`
 
@@ -120,6 +121,7 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    ```
 
 1. **Verify:**
+
 - Table: `dbo.ChurnScoresHistory`
 - View: `dbo.vwCustomerCurrent`
 - Function: `dbo.fnCalculateStatus`
@@ -136,6 +138,7 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
 ### Deployment Steps
 
 1. **Set environment variables in Function App:**
+
 - All variables from `.env.example`
 - Set via Azure Portal → Configuration → Application settings
 
@@ -157,6 +160,7 @@ The `churn_scores_sql_view.csv` file matches the structure of the SQL view `dbo.
    ```
 
 1. **Monitor:**
+
 - Application Insights for logs and traces
 - Function App → Monitor for execution history
 - Email notifications for success/failure
@@ -247,7 +251,20 @@ pyright function_app/
 
 # Run all quality checks
 ruff check . && ruff format --check . && pyright function_app/
+
+# Code quality scoring (CodeHealthAnalyzer - similar to CodeClimate/SonarQube)
+make code-quality
+# Or directly
+codehealthanalyzer analyze function_app/ scripts/ --format html --output outputs/code-quality-report/
+codehealthanalyzer score function_app/ scripts/
 ```
+
+The code quality analyzer provides:
+
+- **Overall quality score** (0-100) - similar to CodeClimate maintainability score
+- **HTML reports** with detailed breakdowns
+- **Violation tracking** by severity
+- **Trend tracking** over time (when run regularly)
 
 ## Troubleshooting
 

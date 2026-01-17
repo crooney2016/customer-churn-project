@@ -6,7 +6,7 @@ and file workflow operations (copy, move, delete, list).
 
 import io
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Optional
 
 import pandas as pd
 from azure.core.exceptions import ResourceNotFoundError
@@ -17,12 +17,12 @@ from azure.storage.blob import (  # pylint: disable=no-name-in-module
     ContainerClient,
 )
 from tenacity import (
-    retry,
-    stop_after_attempt,
-    retry_if_exception_type,
-    wait_exponential,
-    before_sleep_log,
     after_log,
+    before_sleep_log,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
 )
 
 from .config import config
@@ -46,8 +46,8 @@ retry_transient = retry(
         TimeoutError,
         IOError,
     )),
-    before_sleep=before_sleep_log(logger, logging.WARNING),
-    after=after_log(logger, logging.ERROR),
+    before_sleep=before_sleep_log(logger, logging.WARNING),  # type: ignore[arg-type]
+    after=after_log(logger, logging.ERROR),  # type: ignore[arg-type]
     reraise=True,
 )
 
@@ -382,7 +382,7 @@ def list_blobs(
     container_name: str,
     prefix: str = "",
     name_starts_with: str = ""
-) -> List[str]:
+) -> list[str]:
     """
     List blobs in a container, optionally filtered by prefix.
 
@@ -419,7 +419,7 @@ def list_blobs(
 def list_blobs_with_properties(
     container_name: str,
     prefix: str = ""
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     List blobs with their properties/metadata.
 
@@ -479,7 +479,7 @@ def delete_blob_prefix(container_name: str, prefix: str) -> int:
 
 def get_processing_folder_blobs(
     container_name: str = DEFAULT_CONTAINER
-) -> List[str]:
+) -> list[str]:
     """
     Get list of CSV files in the main processing folder (root).
 
@@ -504,7 +504,7 @@ def get_processing_folder_blobs(
 
 def get_processed_folder_blobs(
     container_name: str = DEFAULT_CONTAINER
-) -> List[str]:
+) -> list[str]:
     """
     Get list of files in the processed/ folder.
 
@@ -519,7 +519,7 @@ def get_processed_folder_blobs(
 
 def get_error_folder_blobs(
     container_name: str = DEFAULT_CONTAINER
-) -> List[str]:
+) -> list[str]:
     """
     Get list of files in the error/ folder.
 
@@ -668,7 +668,7 @@ def move_to_error(
 # Utility Functions
 # =============================================================================
 
-def parse_blob_name(blob_name: str) -> Dict[str, str]:
+def parse_blob_name(blob_name: str) -> dict[str, str]:
     """
     Parse blob name into components.
 

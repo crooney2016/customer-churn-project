@@ -9,6 +9,7 @@ pytest-mock>=3.11.0
 
 # Code Quality
 ruff>=0.1.0
+codehealthanalyzer>=1.0.0  # Code quality scoring (0-100) similar to CodeClimate/SonarQube
 
 # Type Checking (already in use)
 # Pyright is typically installed via VS Code extension or npm

@@ -5,9 +5,10 @@ Email client module - generates HTML and POSTs to Logic App endpoint.
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Optional
+
 import requests
-from jinja2 import Environment, FileSystemLoader, TemplateNotFound, TemplateError
+from jinja2 import Environment, FileSystemLoader, TemplateError, TemplateNotFound
 
 from .config import config
 
@@ -24,12 +25,12 @@ try:
         trim_blocks=True,
         lstrip_blocks=True
     )
-except (OSError, IOError) as e:
+except OSError as e:
     logger.warning("Failed to initialize Jinja2 environment: %s", str(e))
     env = None
 
 
-def _render_template(template_name: str, context: Dict[str, Any]) -> str:
+def _render_template(template_name: str, context: dict[str, Any]) -> str:
     """Render an HTML template with the provided context."""
     if env is None:
         raise RuntimeError("Jinja2 environment not initialized")
@@ -60,10 +61,10 @@ def send_success_email(
     row_count: int,
     snapshot_date: str,
     duration_seconds: float,
-    risk_distribution: Dict[str, int],
+    risk_distribution: dict[str, int],
     avg_risk: Optional[float] = None,
     median_risk: Optional[float] = None,
-    top_reasons: Optional[Dict[str, int]] = None,
+    top_reasons: Optional[dict[str, int]] = None,
     model_auc: Optional[float] = None,
     model_version: Optional[str] = None
 ) -> None:

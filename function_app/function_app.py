@@ -15,23 +15,24 @@ Note: This function does NOT execute DAX queries or send emails directly.
 """
 
 import logging
+
 import azure.functions as func  # type: ignore[import-untyped]
 
 from .blob_client import (
-    read_blob_bytes,
-    extract_snapshot_date_from_csv,
-    move_to_processed,
-    move_to_error,
     DEFAULT_CONTAINER,
+    extract_snapshot_date_from_csv,
+    move_to_error,
+    move_to_processed,
+    read_blob_bytes,
 )
 from .csv_validator import (
+    normalize_column_names,
     parse_csv_from_bytes,
     validate_csv_schema,
-    normalize_column_names,
 )
+from .email_client import send_failure_email, send_success_email
 from .scorer import score_customers
 from .sql_client import insert_churn_scores
-from .email_client import send_success_email, send_failure_email
 
 # Create the Function App instance
 app = func.FunctionApp()
@@ -288,7 +289,7 @@ def _run_pipeline(blob_data: bytes, blob_name: str, container_name: str) -> dict
         # Move file to error folder
         try:
             move_to_error(container_name, blob_name)
-        except (OSError, IOError, RuntimeError) as move_err:
+        except (OSError, RuntimeError) as move_err:
             logger.error("Failed to move file to error folder: %s", str(move_err))
 
         # Send failure notification (POST HTML to Logic App)

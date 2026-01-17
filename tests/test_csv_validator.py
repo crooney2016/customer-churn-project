@@ -482,7 +482,7 @@ class TestIntegration:
 # Tests for validate_csv_schema wrapper function
 # =============================================================================
 
-class TestValidateCsvSchema:
+class TestValidateCsvSchemaWrapper:
     """Tests for validate_csv_schema wrapper function."""
 
     def test_validate_csv_schema_success(self, sample_df_normalized):
@@ -521,8 +521,11 @@ class TestValidateCsvSchema:
         """Test validate_csv_schema fails with missing required columns."""
         from function_app.csv_validator import validate_csv_schema
 
-        # Remove required column
-        df = sample_df_normalized.drop(columns=["CustomerId"])
+        # Remove required column but keep enough columns to pass count check
+        df = sample_df_normalized.drop(columns=["CustomerId"]).copy()
+        # Add more columns to pass column count check
+        for i in range(70):
+            df[f"Feature_{i}"] = [i, i + 1, i + 2]
 
         with pytest.raises(ValueError, match="Missing required columns"):
             validate_csv_schema(df, normalize=False)
@@ -534,20 +537,26 @@ class TestValidateCsvSchema:
         # Too few columns
         df = sample_df_normalized.copy()
 
-        with pytest.raises(ValueError, match="Column count"):
+        with pytest.raises(ValueError, match="CSV has too few columns"):
             validate_csv_schema(df, normalize=False)
 
     def test_validate_csv_schema_duplicate_columns(self):
         """Test validate_csv_schema fails with duplicate columns."""
         from function_app.csv_validator import validate_csv_schema
 
+        # Create DataFrame with all required columns and a duplicate
         df = pd.DataFrame({
             "CustomerId": ["001", "002"],
-            "CustomerId": ["001", "002"],  # Duplicate
+            "AccountName": ["Account A", "Account B"],
+            "Segment": ["FITNESS", "FARRELL"],
+            "CostCenter": ["CMFIT", "CMFIT"],
             "SnapshotDate": ["2025-01-31", "2025-01-31"],
+            "Orders_CY": [10, 20],
         })
+        # Create duplicate by modifying columns list
+        df.columns = ["CustomerId", "AccountName", "Segment", "CostCenter", "SnapshotDate", "CustomerId"]
 
-        # Add more columns
+        # Add more columns to pass count check
         for i in range(70):
             df[f"Feature_{i}"] = [i, i + 1]
 

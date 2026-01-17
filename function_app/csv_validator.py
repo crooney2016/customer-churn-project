@@ -5,7 +5,7 @@ Handles CSV parsing, schema validation, and data transformation.
 
 import io
 import logging
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -276,8 +276,8 @@ def validate_no_duplicate_columns(df: pd.DataFrame) -> None:
         ValueError: If duplicate columns are found
     """
     columns = list(df.columns)
-    seen: Set[str] = set()
-    duplicates: List[str] = []
+    seen: set[str] = set()
+    duplicates: list[str] = []
 
     for col in columns:
         if col in seen:
@@ -339,7 +339,7 @@ def validate_column_patterns(df: pd.DataFrame) -> None:
 # Data Type Validation
 # =============================================================================
 
-def validate_column_types(df: pd.DataFrame) -> Dict[str, List[str]]:
+def validate_column_types(df: pd.DataFrame) -> dict[str, list[str]]:
     """
     Validate data types match expected schema.
 
@@ -349,7 +349,7 @@ def validate_column_types(df: pd.DataFrame) -> Dict[str, List[str]]:
     Returns:
         Dictionary with 'warnings' and 'errors' lists
     """
-    issues: Dict[str, List[str]] = {"warnings": [], "errors": []}
+    issues: dict[str, list[str]] = {"warnings": [], "errors": []}
 
     # Check date columns can be parsed
     for col in DATE_COLUMNS:
@@ -402,7 +402,7 @@ def validate_column_types(df: pd.DataFrame) -> Dict[str, List[str]]:
 # Utility Functions
 # =============================================================================
 
-def get_expected_columns() -> Dict[str, str]:
+def get_expected_columns() -> dict[str, str]:
     """
     Get dictionary of expected column names and their types.
 
@@ -441,7 +441,7 @@ def get_expected_columns() -> Dict[str, str]:
     return columns
 
 
-def get_column_summary(df: pd.DataFrame) -> Dict[str, Any]:
+def get_column_summary(df: pd.DataFrame) -> dict[str, Any]:
     """
     Get summary of DataFrame columns for diagnostics.
 

@@ -101,8 +101,8 @@ def test_grant_permissions(mock_sql_connection):
 
     grant_permissions(mock_conn, "testuser")
 
-    # Verify ALTER ROLE statements were executed
-    assert mock_cursor.execute.call_count == 3  # db_datareader, db_datawriter, db_ddladmin
+    # Verify ALTER ROLE statement was executed (now grants db_owner role)
+    assert mock_cursor.execute.call_count == 1  # db_owner
     assert mock_conn.commit.called
 
 
@@ -140,21 +140,22 @@ def test_verify_permissions(mock_sql_connection):
     ]
 
     # Should not raise
-    verify_permissions(mock_conn)
+    verify_permissions(mock_conn, "testuser")
     assert mock_conn.commit.called
 
 
 def test_verify_permissions_fails_select(mock_sql_connection):
-    """Test verify_permissions fails when SELECT permission test fails."""
+    """Test verify_permissions fails when DDL permission test fails."""
     from scripts.deploy_sql_schema import verify_permissions
+    import pymssql
 
     mock_conn, mock_cursor = mock_sql_connection
 
-    # Mock SELECT test failure
-    mock_cursor.fetchone.return_value = None
+    # Mock DDL test failure (verify_permissions now tests DDL, not SELECT)
+    mock_cursor.execute.side_effect = pymssql.Error("DDL permission failed")
 
-    with pytest.raises(RuntimeError, match="SELECT permission"):
-        verify_permissions(mock_conn)
+    with pytest.raises(RuntimeError, match="Permission verification failed"):
+        verify_permissions(mock_conn, "testuser")
 
 
 def test_execute_sql_file(mock_sql_connection, mocker):

@@ -177,14 +177,16 @@ def test_load_model_missing_model_file(mocker):  # pylint: disable=unused-argume
     # Create a mock Path that returns False for model file
     mock_model_path = MagicMock()
     mock_model_path.exists.return_value = False
-    mock_model_path.__str__ = lambda x: "/path/to/churn_model.pkl"
+    # type: ignore[assignment]
+    mock_model_path.__str__ = lambda: "/path/to/churn_model.pkl"
 
     mock_model_columns_path = MagicMock()
     mock_model_columns_path.exists.return_value = True
-    mock_model_columns_path.__str__ = lambda x: "/path/to/model_columns.pkl"
+    # type: ignore[assignment]
+    mock_model_columns_path.__str__ = lambda: "/path/to/model_columns.pkl"
 
     # Mock Path constructor to return our mock paths
-    def mock_path_init(self, *args):
+    def mock_path_init(*args):  # pylint: disable=unused-argument
         path_str = str(args[0]) if args else ""
         if "churn_model.pkl" in path_str:
             return mock_model_path
@@ -206,14 +208,16 @@ def test_load_model_missing_model_columns_file(mocker):  # pylint: disable=unuse
     # Create mock paths
     mock_model_path = MagicMock()
     mock_model_path.exists.return_value = True
-    mock_model_path.__str__ = lambda x: "/path/to/churn_model.pkl"
+    # type: ignore[assignment]
+    mock_model_path.__str__ = lambda: "/path/to/churn_model.pkl"
 
     mock_model_columns_path = MagicMock()
     mock_model_columns_path.exists.return_value = False  # Columns file missing
-    mock_model_columns_path.__str__ = lambda x: "/path/to/model_columns.pkl"
+    # type: ignore[assignment]
+    mock_model_columns_path.__str__ = lambda: "/path/to/model_columns.pkl"
 
     # Mock Path constructor
-    def mock_path_init(self, *args):
+    def mock_path_init(*args):  # pylint: disable=unused-argument
         path_str = str(args[0]) if args else ""
         if "churn_model.pkl" in path_str:
             return mock_model_path

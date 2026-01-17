@@ -140,7 +140,8 @@ def test_insert_scores_with_nan_values(mock_sql_connection):
 
     assert rows_written == 2
     assert cursor.executemany.called
-    # Verify None values were handled (check that executemany was called with tuples containing None)
+    # Verify None values were handled
+    # (check that executemany was called with tuples containing None)
     call_args = cursor.executemany.call_args
     assert call_args is not None
     data_tuples = call_args[0][1]  # Second argument is data tuples
@@ -160,9 +161,7 @@ def test_insert_scores_calls_merge_procedure(mock_sql_connection, sample_scored_
     merge_called = any("spMergeChurnScoresFromStaging" in str(call) for call in execute_calls)
     assert merge_called, "MERGE stored procedure should be called"
 
-    # Verify truncate was called
-    truncate_called = any("TRUNCATE" in str(call).upper() for call in execute_calls)
-    assert truncate_called, "TRUNCATE should be called after MERGE"
+    # Note: TRUNCATE is now handled inside the stored procedure, not in Python code
 
 
 def test_insert_scores_empty_dataframe(mock_sql_connection):
@@ -409,7 +408,7 @@ class TestGetConnection:
         """Test get_connection raises error when connection string is missing."""
         # Mock config to return None
         mocker.patch("function_app.sql_client.config.SQL_CONNECTION_STRING", None)
-        
+
         # get_connection() will try to parse None, which will fail with AttributeError
         # when _parse_connection_string tries to call .split() on None
         # This is expected behavior - should raise AttributeError
@@ -440,7 +439,7 @@ class TestGetConnection:
         try:
             result = _parse_connection_string("invalid")
             # If parsing succeeds, connection will fail at connect() stage
-            assert "server" in result or result == {}
+            assert "server" in result or not result
         except (ValueError, AttributeError):
             # Parsing failed - that's okay for invalid input
             pass

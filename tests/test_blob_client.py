@@ -680,7 +680,9 @@ def test_get_container_client(_mock_config, mock_blob_service_client):
 
     mock_service, mock_container, _ = mock_blob_service_client
 
-    with pytest.mock.patch(
+    from unittest.mock import patch
+
+    with patch(
         "function_app.blob_client._get_blob_service_client",
         return_value=mock_service
     ):
@@ -692,10 +694,11 @@ def test_get_container_client(_mock_config, mock_blob_service_client):
 def test_get_blob_client(_mock_config, mock_blob_service_client):
     """Test _get_blob_client returns BlobClient."""
     from function_app.blob_client import _get_blob_client
+    from unittest.mock import patch
 
     mock_service, _, mock_blob = mock_blob_service_client
 
-    with pytest.mock.patch(
+    with patch(
         "function_app.blob_client._get_blob_service_client",
         return_value=mock_service
     ):
@@ -705,3 +708,59 @@ def test_get_blob_client(_mock_config, mock_blob_service_client):
             container="test-container",
             blob="test-blob.csv"
         )
+
+
+# =============================================================================
+# Edge Case Tests for Error Handling
+# =============================================================================
+
+class TestBlobClientEdgeCases:
+    """Edge case tests for error handling paths."""
+
+    def test_get_blob_service_client_empty_connection_string(self, mocker):
+        """Test _get_blob_service_client raises ValueError for empty string (line 71)."""
+        mock_config = mocker.patch("function_app.blob_client.config")
+        mock_config.BLOB_STORAGE_CONNECTION_STRING = ""  # Empty string
+
+        from function_app.blob_client import _get_blob_service_client
+
+        with pytest.raises(ValueError, match="BLOB_STORAGE_CONNECTION_STRING not configured"):
+            _get_blob_service_client()
+
+    def test_write_blob_text_handles_encoding_error(self, _mock_config, mocker):
+        """Test write_blob_text handles encoding errors (line 215-216)."""
+        mock_write_bytes = mocker.patch("function_app.blob_client.write_blob_bytes")
+
+        from function_app.blob_client import write_blob_text
+
+        # Normal case should work
+        write_blob_text("container", "blob.txt", "test text", encoding="utf-8")
+        mock_write_bytes.assert_called_once()
+
+        # Test with different encoding
+        mock_write_bytes.reset_mock()
+        write_blob_text("container", "blob.txt", "test text", encoding="latin-1")
+        mock_write_bytes.assert_called_once()
+
+    def test_get_blob_properties_raises_resource_not_found(
+        self, _mock_config, mock_blob_service_client, mocker
+    ):
+        """Test get_blob_properties raises ResourceNotFoundError.
+
+        Tests error handling when blob doesn't exist (lines 274-275).
+        """
+        from azure.core.exceptions import ResourceNotFoundError
+        _, _, mock_blob = mock_blob_service_client
+
+        # Make get_blob_properties raise ResourceNotFoundError
+        mock_blob.get_blob_properties.side_effect = ResourceNotFoundError("Blob not found")
+
+        mocker.patch(
+            "function_app.blob_client._get_blob_client",
+            return_value=mock_blob
+        )
+
+        from function_app.blob_client import get_blob_properties
+
+        with pytest.raises(ResourceNotFoundError, match="Blob not found"):
+            get_blob_properties("container", "nonexistent.csv")

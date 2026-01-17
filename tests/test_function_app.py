@@ -100,6 +100,157 @@ class TestRunPipeline:
             _run_pipeline(b"csv,data", "test.csv", "container")
 
         mock_send_failure.assert_called_once()
+
+    def test_run_pipeline_handles_missing_churn_risk_column(self, mocker, sample_input_df, sample_scored_df):
+        """Test pipeline handles missing ChurnRiskPct column (lines 230-231)."""
+        # Create scored_df without ChurnRiskPct column
+        scored_df_no_risk = sample_scored_df.drop(columns=["ChurnRiskPct"], errors="ignore")
+
+        mocker.patch(
+            "function_app.function_app.extract_snapshot_date_from_csv",
+            return_value="2025-01-31"
+        )
+        mocker.patch(
+            "function_app.function_app.parse_csv_from_bytes",
+            return_value=sample_input_df
+        )
+        mocker.patch("function_app.function_app.validate_csv_schema")
+        mocker.patch(
+            "function_app.function_app.normalize_column_names",
+            return_value=sample_input_df
+        )
+        mocker.patch(
+            "function_app.function_app.score_customers",
+            return_value=scored_df_no_risk
+        )
+        mocker.patch(
+            "function_app.function_app.insert_churn_scores",
+            return_value=len(scored_df_no_risk)
+        )
+        mocker.patch(
+            "function_app.function_app.move_to_processed",
+            return_value="processed/file_2025-01-31.csv"
+        )
+        mock_send_email = mocker.patch("function_app.function_app.send_success_email")
+
+        from function_app.function_app import _run_pipeline
+
+        result = _run_pipeline(b"csv,data", "test.csv", "container")
+
+        assert result["status"] == "success"
+        # Verify email called with None for avg_risk and median_risk
+        mock_send_email.assert_called_once()
+        call_args = mock_send_email.call_args
+        assert call_args.kwargs.get("avg_risk") is None
+        assert call_args.kwargs.get("median_risk") is None
+
+    def test_run_pipeline_handles_none_reasons(self, mocker, sample_input_df, sample_scored_df):
+        """Test pipeline handles None/empty reasons (lines 243, 247)."""
+        # Create scored_df with None/empty reasons
+        scored_df_with_none = sample_scored_df.copy()
+        scored_df_with_none["Reason_1"] = [None, "", "nan", "Valid Reason"]
+        scored_df_with_none["Reason_2"] = ["  ", None, "None", None]
+
+        mocker.patch(
+            "function_app.function_app.extract_snapshot_date_from_csv",
+            return_value="2025-01-31"
+        )
+        mocker.patch(
+            "function_app.function_app.parse_csv_from_bytes",
+            return_value=sample_input_df
+        )
+        mocker.patch("function_app.function_app.validate_csv_schema")
+        mocker.patch(
+            "function_app.function_app.normalize_column_names",
+            return_value=sample_input_df
+        )
+        mocker.patch(
+            "function_app.function_app.score_customers",
+            return_value=scored_df_with_none
+        )
+        mocker.patch(
+            "function_app.function_app.insert_churn_scores",
+            return_value=len(scored_df_with_none)
+        )
+        mocker.patch(
+            "function_app.function_app.move_to_processed",
+            return_value="processed/file_2025-01-31.csv"
+        )
+        mock_send_email = mocker.patch("function_app.function_app.send_success_email")
+
+        from function_app.function_app import _run_pipeline
+
+        result = _run_pipeline(b"csv,data", "test.csv", "container")
+
+        assert result["status"] == "success"
+        # Verify email was called (should filter out None/empty reasons)
+        mock_send_email.assert_called_once()
+
+    def test_run_pipeline_handles_move_to_error_failure(self, mocker):
+        """Test pipeline handles error when moving file to error folder (lines 291-292)."""
+        mocker.patch(
+            "function_app.function_app.extract_snapshot_date_from_csv",
+            side_effect=ValueError("Parse error")
+        )
+        # Make move_to_error raise an exception
+        mock_move_error = mocker.patch(
+            "function_app.function_app.move_to_error",
+            side_effect=OSError("Move failed")
+        )
+        mocker.patch("function_app.function_app.send_failure_email")
+
+        from function_app.function_app import _run_pipeline
+
+        # Should still raise original error, but log move failure
+        with pytest.raises(ValueError, match="Parse error"):
+            _run_pipeline(b"bad,data", "test.csv", "container")
+
+        # Should have attempted to move to error folder
+        mock_move_error.assert_called_once()
+
+    def test_run_pipeline_handles_notification_failure(self, mocker):
+        """Test pipeline handles error when sending failure notification (lines 301-302)."""
+        mocker.patch(
+            "function_app.function_app.extract_snapshot_date_from_csv",
+            side_effect=RuntimeError("Processing error")
+        )
+        mocker.patch("function_app.function_app.move_to_error")
+        # Make send_failure_email raise an exception
+        mock_send_failure = mocker.patch(
+            "function_app.function_app.send_failure_email",
+            side_effect=ConnectionError("Email send failed")
+        )
+
+        from function_app.function_app import _run_pipeline
+
+        # Should still raise original error, but log notification failure
+        with pytest.raises(RuntimeError, match="Processing error"):
+            _run_pipeline(b"bad,data", "test.csv", "container")
+
+        # Should have attempted to send failure email
+        mock_send_failure.assert_called_once()
+
+    def test_process_churn_csv_handles_all_exceptions(self, mocker):
+        """Test process_churn_csv catches all exceptions (lines 91-93)."""
+        mocker.patch(
+            "function_app.function_app.read_blob_bytes",
+            side_effect=Exception("Unexpected error")
+        )
+        mock_run_pipeline = mocker.patch("function_app.function_app._run_pipeline")
+
+        from function_app.function_app import process_churn_csv
+        from azure.functions import InputStream
+
+        mock_input = mocker.MagicMock(spec=InputStream)
+        mock_input.name = "test.csv"
+        mock_blob_trigger = mocker.MagicMock()
+        mock_blob_trigger.name = "test.csv"
+
+        # Should not raise - catches all exceptions
+        process_churn_csv(mock_blob_trigger)
+
+        # Should have attempted to read blob
+        assert mock_run_pipeline.call_count == 0  # Never called due to exception
         call_kwargs = mock_send_failure.call_args[1]
         assert call_kwargs["error_type"] == "ConnectionError"
         assert "DB connection failed" in call_kwargs["error_message"]

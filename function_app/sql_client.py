@@ -6,15 +6,15 @@ Uses pymssql (FreeTDS-based, no ODBC driver required) for connections.
 import logging
 import time
 from datetime import datetime
-from typing import List
+
 import pandas as pd
 import pymssql
 from tenacity import (
+    before_sleep_log,
     retry,
+    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
 )
 
 from .config import config
@@ -39,9 +39,9 @@ REQUIRED_COLUMNS = ["CustomerId", "SnapshotDate"]
 def _parse_connection_string(connection_string: str) -> dict:
     """
     Parse connection string to pymssql.connect() parameters.
-    
+
     Expected format: Server=hostname;Port=1433;Database=dbname;UID=username;PWD=password;
-    
+
     All parameters except Server are optional (Port defaults to 1433).
     """
     params = {}
@@ -51,7 +51,7 @@ def _parse_connection_string(connection_string: str) -> dict:
             key, value = part.split('=', 1)
             key = key.strip().lower()
             value = value.strip()
-            
+
             if key == 'server':
                 params['server'] = value
             elif key == 'port':
@@ -62,7 +62,7 @@ def _parse_connection_string(connection_string: str) -> dict:
                 params['user'] = value
             elif key in ['pwd', 'password']:
                 params['password'] = value
-    
+
     return params
 
 
@@ -79,18 +79,18 @@ def get_connection() -> pymssql.Connection:
 
     Includes retry logic for Azure SQL Serverless cold starts which can take
     up to 60 seconds to resume from paused state.
-    
+
     Connection string format: Server=hostname;Port=1433;Database=dbname;UID=username;PWD=password;
-    
+
     Returns:
         pymssql.Connection: Database connection object
     """
     logger.debug("Establishing SQL database connection")
     connection_string = config.SQL_CONNECTION_STRING
-    
+
     # Parse connection string to pymssql parameters
     conn_params = _parse_connection_string(connection_string)
-    
+
     # pymssql.connect() uses keyword arguments
     conn = pymssql.connect(**conn_params, timeout=CONNECTION_TIMEOUT)
     logger.debug("SQL connection established successfully")
@@ -98,7 +98,7 @@ def get_connection() -> pymssql.Connection:
     return conn
 
 
-def _validate_dataframe_schema(df: pd.DataFrame, required_columns: List[str]) -> None:
+def _validate_dataframe_schema(df: pd.DataFrame, required_columns: list[str]) -> None:
     """
     Validate DataFrame has required columns for SQL insert.
 
@@ -229,7 +229,7 @@ def insert_churn_scores(df: pd.DataFrame, batch_size: int = 5000) -> int:
         # The procedure handles MERGE, truncate, and transaction internally
         logger.debug("Step '%s': Calling MERGE stored procedure", step)
         cursor.execute(f"EXEC {MERGE_PROCEDURE}")
-        
+
         # Fetch MERGE results (inserted/updated counts)
         merge_result = cursor.fetchone()
         if merge_result and len(merge_result) >= 3:

@@ -33,12 +33,26 @@ jobs:
         run: |
           pytest --cov=function_app --cov-report=xml --cov-report=term-missing -v
 
+      - name: Generate test suite report
+        run: |
+          python3 scripts/generate_test_suite_report.py || true
+        continue-on-error: true
+
       - name: Upload coverage to Codecov (optional)
         uses: codecov/codecov-action@v3
         with:
           files: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+        continue-on-error: true
+
+      - name: Upload test suite report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-suite-report
+          path: outputs/test-suite-report.md
+          retention-days: 30
         continue-on-error: true
 
   lint:

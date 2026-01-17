@@ -6,9 +6,9 @@ Loads model, preprocesses data, scores, and generates reasons.
 import pickle
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Tuple
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 import xgboost as xgb
 
 
@@ -184,7 +184,7 @@ def reason_text(feature: str, mode: str) -> str:
         return f"Favorable {base}"
 
 
-def top_reasons(row_contrib: pd.Series, risk: float, n: int = 3) -> List[str]:
+def top_reasons(row_contrib: pd.Series, risk: float, n: int = 3) -> list[str]:
     """Generate top N reasons from feature contributions."""
     s = row_contrib.drop(labels=["BIAS"], errors="ignore")
 
@@ -204,7 +204,7 @@ def top_reasons(row_contrib: pd.Series, risk: float, n: int = 3) -> List[str]:
 
 
 @lru_cache(maxsize=1)
-def load_model() -> Tuple[object, List[str]]:
+def load_model() -> tuple[object, list[str]]:
     """
     Load XGBoost model and model columns.
 
@@ -225,10 +225,21 @@ def load_model() -> Tuple[object, List[str]]:
             f"Model columns file not found: {model_columns_path}"
         )
 
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
-    with open(model_columns_path, "rb") as f:
-        model_columns = pickle.load(f)
+    try:
+        with open(model_path, "rb") as f:
+            model = pickle.load(f)
+    except (EOFError, FileNotFoundError) as e:
+        # EOFError can occur if file is empty or corrupted
+        raise FileNotFoundError(f"Model file not found or is empty: {model_path}") from e
+
+    try:
+        with open(model_columns_path, "rb") as f:
+            model_columns = pickle.load(f)
+    except (EOFError, FileNotFoundError) as e:
+        # EOFError can occur if file is empty or corrupted
+        raise FileNotFoundError(
+            f"Model columns file not found or is empty: {model_columns_path}"
+        ) from e
 
     return model, model_columns
 
