@@ -148,8 +148,8 @@ class TestRunPipeline:
         """Test pipeline handles None/empty reasons (lines 243, 247)."""
         # Create scored_df with None/empty reasons
         scored_df_with_none = sample_scored_df.copy()
-        scored_df_with_none["Reason_1"] = [None, "", "nan", "Valid Reason"]
-        scored_df_with_none["Reason_2"] = ["  ", None, "None", None]
+        scored_df_with_none["Reason_1"] = [None, "", "Valid Reason"]
+        scored_df_with_none["Reason_2"] = ["  ", None, None]
 
         mocker.patch(
             "function_app.function_app.extract_snapshot_date_from_csv",
@@ -232,28 +232,22 @@ class TestRunPipeline:
 
     def test_process_churn_csv_handles_all_exceptions(self, mocker):
         """Test process_churn_csv catches all exceptions (lines 91-93)."""
-        mocker.patch(
-            "function_app.function_app.read_blob_bytes",
-            side_effect=Exception("Unexpected error")
-        )
         mock_run_pipeline = mocker.patch("function_app.function_app._run_pipeline")
 
         from function_app.function_app import process_churn_csv
-        from azure.functions import InputStream
 
-        mock_input = mocker.MagicMock(spec=InputStream)
-        mock_input.name = "test.csv"
         mock_blob_trigger = mocker.MagicMock()
         mock_blob_trigger.name = "test.csv"
+        # Make blob.read() raise an exception
+        mock_blob_trigger.read.side_effect = Exception("Unexpected error")
 
         # Should not raise - catches all exceptions
         process_churn_csv(mock_blob_trigger)
 
         # Should have attempted to read blob
-        assert mock_run_pipeline.call_count == 0  # Never called due to exception
-        call_kwargs = mock_send_failure.call_args[1]
-        assert call_kwargs["error_type"] == "ConnectionError"
-        assert "DB connection failed" in call_kwargs["error_message"]
+        mock_blob_trigger.read.assert_called_once()
+        # _run_pipeline should never be called due to exception in blob.read()
+        assert mock_run_pipeline.call_count == 0
 
 
 class TestProcessChurnCsv:

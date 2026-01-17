@@ -13,7 +13,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+# Type hints removed - not used in this script
 
 PROJECT_ROOT = Path(__file__).parent.parent
 OUTPUT_DIR = PROJECT_ROOT / "docs"
@@ -94,8 +94,7 @@ def get_code_quality_scores():
             print(f"    {target_dir}/: {score}/100")
         except ImportError:
             print(f"    ⚠️  CodeHealthAnalyzer not available for {target_dir}")
-        except Exception as e:
-            # pylint: disable=broad-exception-caught
+        except Exception as e:  # pylint: disable=broad-exception-caught
             print(f"    ⚠️  Error analyzing {target_dir}: {e}")
 
     return scores
@@ -206,9 +205,11 @@ def detect_performance_patterns():
     return findings
 
 
-def generate_report(test_results, coverage_data, quality_scores, linting_results, performance_findings):
+def generate_report(
+    test_results, coverage_data, quality_scores, linting_results, performance_findings
+):
     """Generate comprehensive markdown report."""
-    test_passed, test_output, test_error, _coverage = test_results
+    test_passed, _test_output, _test_error, _coverage = test_results
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     report_lines = [
@@ -307,8 +308,16 @@ def generate_report(test_results, coverage_data, quality_scores, linting_results
         "",
     ])
 
-    ruff_status = "✅ Passed" if linting_results['ruff']['passed'] else f"❌ {linting_results['ruff']['count']} issues"
-    pyright_status = "✅ Passed" if linting_results['pyright']['passed'] else f"❌ {linting_results['pyright']['count']} issues"
+    ruff_status = (
+        "✅ Passed"
+        if linting_results['ruff']['passed']
+        else f"❌ {linting_results['ruff']['count']} issues"
+    )
+    pyright_status = (
+        "✅ Passed"
+        if linting_results['pyright']['passed']
+        else f"❌ {linting_results['pyright']['count']} issues"
+    )
 
     report_lines.extend([
         f"- **Ruff**: {ruff_status}",
@@ -327,7 +336,9 @@ def generate_report(test_results, coverage_data, quality_scores, linting_results
             "|------|------|-------|----------|-----|",
         ])
 
-        for finding in sorted(performance_findings, key=lambda x: (x['severity'] == 'Critical', x['file'])):
+        for finding in sorted(
+            performance_findings, key=lambda x: (x['severity'] == 'Critical', x['file'])
+        ):
             severity_emoji = "🔴" if finding['severity'] == 'Critical' else "🟡"
             report_lines.append(
                 f"| `{finding['file']}` | {finding['line']} | "
@@ -351,7 +362,9 @@ def generate_report(test_results, coverage_data, quality_scores, linting_results
     if not lint_passed:
         recommendations.append("2. **Fix linting errors**: Run `make lint-fix` to auto-fix issues.")
     if critical_issues > 0:
-        recommendations.append(f"3. **Address {critical_issues} critical performance issue(s)**: High cost impact.")
+        recommendations.append(
+            f"3. **Address {critical_issues} critical performance issue(s)**: High cost impact."
+        )
     if main_score < 80:
         recommendations.append("4. **Improve code quality score**: Focus on reducing violations.")
 
@@ -395,10 +408,11 @@ def main():
         coverage_data = test_results[3] if len(test_results) > 3 else {}
 
         # Generate report
-        generate_report(test_results, coverage_data, quality_scores, linting_results, performance_findings)
+        generate_report(
+            test_results, coverage_data, quality_scores, linting_results, performance_findings
+        )
 
-    except Exception as e:
-        # pylint: disable=broad-exception-caught
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print(f"⚠️  Error generating report: {e}")
         import traceback
         traceback.print_exc()
